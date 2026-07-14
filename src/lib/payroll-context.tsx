@@ -106,7 +106,8 @@ export function PayrollProvider({ children }: { children: ReactNode }) {
   const generatePayrollUpload = useCallback(() => {
     setState((s) => {
       const rows = toPayrollUpload(s.tsheetRows, s.bonuses, s.commissions);
-      return { ...s, payrollUploadRows: rows, currentStep: 2 };
+      const groups = toMasterSummary(rows, s.tsheetRows, s.employeeRates, s.deductions);
+      return { ...s, payrollUploadRows: rows, masterSummaryGroups: groups, currentStep: 2 };
     });
   }, []);
 
