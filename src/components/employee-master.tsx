@@ -40,7 +40,7 @@ const selectOptions: Record<string, string[]> = {
 };
 
 function displayValue(value: SheetCellValue) {
-  if (value === null || value === "") return "—";
+  if (value === null || value === "") return "-";
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
   if (typeof value === "number" && !Number.isInteger(value)) return value.toFixed(2);
   return String(value);
@@ -172,6 +172,7 @@ export function EmployeeMaster() {
 function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
   const [activeSheet, setActiveSheet] = useState<SheetKey>("employees");
   const [records, setRecords] = useState<SheetRecord[]>([]);
+  const [employeeRecords, setEmployeeRecords] = useState<SheetRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
@@ -187,12 +188,21 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
     return result.records ?? [];
   }, []);
 
+  const loadView = useCallback(async (sheet: SheetKey) => {
+    const currentRecords = await loadRecords(sheet);
+    if (sheet === "employees") {
+      return { currentRecords, employees: currentRecords };
+    }
+    return { currentRecords, employees: await loadRecords("employees") };
+  }, [loadRecords]);
+
   useEffect(() => {
     let cancelled = false;
-    void loadRecords(activeSheet)
-      .then((nextRecords) => {
+    void loadView(activeSheet)
+      .then(({ currentRecords, employees }) => {
         if (!cancelled) {
-          setRecords(nextRecords);
+          setRecords(currentRecords);
+          setEmployeeRecords(employees);
           setError("");
           setLoading(false);
         }
@@ -206,15 +216,35 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
     return () => {
       cancelled = true;
     };
-  }, [activeSheet, loadRecords]);
+  }, [activeSheet, loadView]);
+
+  const displayedRecords = useMemo(() => {
+    if (activeSheet === "employees") return records;
+
+    return employeeRecords.flatMap((employee) => {
+      const employeeNumber = String(employee.values["Employee Number"] ?? "").trim();
+      const employeeName = String(employee.values["Employee Name"] ?? "").trim();
+      const matches = records.filter(
+        (record) => String(record.values["Employee Number"] ?? "").trim() === employeeNumber
+      );
+      if (matches.length > 0) return matches;
+
+      const headers = SHEET_DEFINITIONS[activeSheet].headers;
+      const defaults = blankValues(activeSheet);
+      const values = Object.fromEntries(headers.map((header, index) => [header, defaults[index]]));
+      values["Employee Number"] = employeeNumber;
+      values["Employee Name"] = employeeName;
+      return [{ rowNumber: -employee.rowNumber, values }];
+    });
+  }, [activeSheet, employeeRecords, records]);
 
   const filteredRecords = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return records;
-    return records.filter((record) =>
+    if (!query) return displayedRecords;
+    return displayedRecords.filter((record) =>
       Object.values(record.values).some((value) => displayValue(value).toLowerCase().includes(query))
     );
-  }, [records, search]);
+  }, [displayedRecords, search]);
 
   const changeSheet = (sheet: SheetKey) => {
     setActiveSheet(sheet);
@@ -226,7 +256,13 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
 
   const editRecord = (record: SheetRecord) => {
     const headers = SHEET_DEFINITIONS[activeSheet].headers;
-    setEditor({ rowNumber: record.rowNumber, values: headers.map((header) => displayValue(record.values[header]).replace("—", "")) });
+    setEditor({
+      rowNumber: record.rowNumber > 0 ? record.rowNumber : undefined,
+      values: headers.map((header) => {
+        const displayed = displayValue(record.values[header]);
+        return displayed === "-" ? "" : displayed;
+      }),
+    });
     setSavedMessage("");
   };
 
@@ -249,13 +285,57 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
     const result = (await response.json()) as { message?: string };
 
     if (response.ok) {
-      const nextRecords = await loadRecords(activeSheet);
-      setRecords(nextRecords);
+      const nextView = await loadView(activeSheet);
+      setRecords(nextView.currentRecords);
+      setEmployeeRecords(nextView.employees);
       setEditor(null);
       setSavedMessage("Saved to Google Sheets");
       window.setTimeout(() => setSavedMessage(""), 3000);
     } else {
       setError(result.message ?? "Unable to save.");
+    }
+    setSaving(false);
+  };
+
+  const deleteEmployee = async () => {
+    if (!editor?.rowNumber || activeSheet !== "employees") return;
+    const headers = SHEET_DEFINITIONS.employees.headers;
+    const employeeNumber = editor.values[headers.indexOf("Employee Number")];
+    const employeeName = editor.values[headers.indexOf("Employee Name")];
+    if (!window.confirm(`Delete ${employeeName || "this employee"}? Their rate and deduction rows will also be removed.`)) return;
+
+    setSaving(true);
+    const response = await fetch("/api/google-sheets/employees", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rowNumber: editor.rowNumber, employeeNumber }),
+    });
+    const result = (await response.json()) as { message?: string };
+    if (response.ok) {
+      const nextView = await loadView("employees");
+      setRecords(nextView.currentRecords);
+      setEmployeeRecords(nextView.employees);
+      setEditor(null);
+      setSavedMessage("Employee and related payroll rows deleted");
+    } else {
+      setError(result.message ?? "Unable to delete employee.");
+    }
+    setSaving(false);
+  };
+
+  const cleanOldRows = async () => {
+    if (!window.confirm("Remove the demo rows and any rate or deduction rows that no longer belong to an employee?")) return;
+    setSaving(true);
+    setError("");
+    const response = await fetch("/api/google-sheets/cleanup", { method: "DELETE" });
+    const result = (await response.json()) as { deletedRates?: number; deletedDeductions?: number; message?: string };
+    if (response.ok) {
+      const nextView = await loadView(activeSheet);
+      setRecords(nextView.currentRecords);
+      setEmployeeRecords(nextView.employees);
+      setSavedMessage(`Removed ${result.deletedRates ?? 0} old rates and ${result.deletedDeductions ?? 0} old deductions`);
+    } else {
+      setError(result.message ?? "Unable to clean old rows.");
     }
     setSaving(false);
   };
@@ -315,12 +395,28 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
         </div>
       </div>
 
+      {activeSheet !== "employees" && (
+        <div className="flex flex-col gap-3 rounded-xl border border-[#CFE6B0] bg-[#F4F9EE] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-[#36580B]">
+            <strong>Synced with Employees:</strong> every employee appears here automatically. Save a row only when they need {activeSheet === "rates" ? "a rate" : "a deduction or reimbursement"}.
+          </p>
+          <button
+            type="button"
+            onClick={() => void cleanOldRows()}
+            disabled={saving}
+            className="whitespace-nowrap rounded-lg border border-[#78BE20] px-3 py-2 text-xs font-bold text-[#36580B] hover:bg-white disabled:opacity-50"
+          >
+            Remove demo/old rows
+          </button>
+        </div>
+      )}
+
       {savedMessage && <div className="rounded-lg border border-[#B8DF86] bg-[#F1F8E8] px-4 py-3 text-sm font-semibold text-[#36580B]">✓ {savedMessage}</div>}
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-200 bg-[#F7F8F6] px-4 py-3">
-          <span className="text-sm font-semibold text-[#202322]">{filteredRecords.length} records</span>
+          <span className="text-sm font-semibold text-[#202322]">{filteredRecords.length} {activeSheet === "employees" ? "employees" : "employee records"}</span>
           <span className="text-xs text-gray-500">Click a row to edit</span>
         </div>
         {loading ? (
@@ -342,7 +438,7 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
                         {displayValue(record.values[header])}
                       </td>
                     ))}
-                    <td className="px-4 py-3 text-right font-semibold text-[#4F7F13]">Edit</td>
+                    <td className="px-4 py-3 text-right font-semibold text-[#4F7F13]">{record.rowNumber > 0 ? "Edit" : "Set up"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -387,9 +483,12 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
                   </label>
                 ))}
               </div>
-              <div className="sticky bottom-0 flex gap-3 border-t border-gray-200 bg-white px-6 py-4">
-                <button type="button" onClick={() => setEditor(null)} className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold hover:bg-gray-50">Cancel</button>
-                <button type="submit" disabled={saving} className="flex-1 rounded-lg bg-[#78BE20] px-4 py-2.5 text-sm font-bold text-[#111312] hover:bg-[#69A91B] disabled:opacity-50">
+              <div className="sticky bottom-0 flex flex-wrap gap-3 border-t border-gray-200 bg-white px-6 py-4">
+                {activeSheet === "employees" && editor.rowNumber && (
+                  <button type="button" onClick={() => void deleteEmployee()} disabled={saving} className="rounded-lg border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">Delete employee</button>
+                )}
+                <button type="button" onClick={() => setEditor(null)} className="min-w-28 flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold hover:bg-gray-50">Cancel</button>
+                <button type="submit" disabled={saving} className="min-w-40 flex-1 rounded-lg bg-[#78BE20] px-4 py-2.5 text-sm font-bold text-[#111312] hover:bg-[#69A91B] disabled:opacity-50">
                   {saving ? "Saving…" : "Save to Google Sheet"}
                 </button>
               </div>

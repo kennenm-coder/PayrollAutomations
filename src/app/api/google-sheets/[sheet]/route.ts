@@ -1,6 +1,7 @@
 import { isPayrollAdmin } from "@/lib/admin-auth";
 import {
   appendSheetRow,
+  deleteEmployeeAndRelatedRecords,
   readSheet,
   updateSheetRow,
 } from "@/lib/google-sheets";
@@ -75,5 +76,29 @@ export async function POST(request: Request, context: RouteParams) {
   } catch (error) {
     console.error("Unable to append to Google Sheet:", error);
     return Response.json({ message: "Unable to add this row." }, { status: 502 });
+  }
+}
+
+export async function DELETE(request: Request, context: RouteParams) {
+  const access = await authorizedSheet(context);
+  if (!access.ok) return errorResponse(access.error);
+  if (access.sheet !== "employees") {
+    return Response.json({ message: "Only employees can be deleted here." }, { status: 405 });
+  }
+
+  const body = (await request.json().catch(() => null)) as
+    | { rowNumber?: number; employeeNumber?: string }
+    | null;
+  if (!body?.rowNumber || !body.employeeNumber) {
+    return Response.json({ message: "Invalid employee deletion." }, { status: 400 });
+  }
+
+  try {
+    return Response.json(
+      await deleteEmployeeAndRelatedRecords(body.rowNumber, body.employeeNumber)
+    );
+  } catch (error) {
+    console.error("Unable to delete employee:", error);
+    return Response.json({ message: "Unable to delete this employee." }, { status: 502 });
   }
 }

@@ -142,6 +142,116 @@ export async function appendSheetRow(sheetKey: SheetKey, values: unknown[]) {
   });
 }
 
+async function sheetIdsByName() {
+  const { spreadsheetId, sheets } = getSheetsClient();
+  const response = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets.properties(sheetId,title)",
+  });
+
+  return new Map(
+    (response.data.sheets ?? []).flatMap((sheet) => {
+      const title = sheet.properties?.title;
+      const sheetId = sheet.properties?.sheetId;
+      return title && sheetId !== undefined ? [[title, sheetId] as const] : [];
+    })
+  );
+}
+
+async function deleteRows(rowsBySheet: Map<string, number[]>) {
+  const { spreadsheetId, sheets } = getSheetsClient();
+  const sheetIds = await sheetIdsByName();
+  const requests = [...rowsBySheet.entries()].flatMap(([sheetName, rowNumbers]) => {
+    const sheetId = sheetIds.get(sheetName);
+    if (sheetId === undefined) throw new Error(`The ${sheetName} tab was not found.`);
+
+    return [...new Set(rowNumbers)]
+      .sort((left, right) => right - left)
+      .map((rowNumber) => ({
+        deleteDimension: {
+          range: {
+            sheetId,
+            dimension: "ROWS" as const,
+            startIndex: rowNumber - 1,
+            endIndex: rowNumber,
+          },
+        },
+      }));
+  });
+
+  if (requests.length > 0) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: { requests },
+    });
+  }
+}
+
+export async function deleteEmployeeAndRelatedRecords(rowNumber: number, employeeNumber: string) {
+  if (!Number.isInteger(rowNumber) || rowNumber < 2 || !employeeNumber.trim()) {
+    throw new Error("Invalid employee deletion request.");
+  }
+
+  const [employees, rates, deductions] = await Promise.all([
+    readSheet("employees"),
+    readSheet("rates"),
+    readSheet("deductions"),
+  ]);
+  const employee = employees.records.find(
+    (record) =>
+      record.rowNumber === rowNumber &&
+      String(record.values["Employee Number"] ?? "").trim() === employeeNumber.trim()
+  );
+  if (!employee) throw new Error("The employee row changed. Refresh and try again.");
+
+  const relatedRateRows = rates.records
+    .filter((record) => String(record.values["Employee Number"] ?? "").trim() === employeeNumber.trim())
+    .map((record) => record.rowNumber);
+  const relatedDeductionRows = deductions.records
+    .filter((record) => String(record.values["Employee Number"] ?? "").trim() === employeeNumber.trim())
+    .map((record) => record.rowNumber);
+
+  await deleteRows(new Map([
+    [SHEET_DEFINITIONS.rates.name, relatedRateRows],
+    [SHEET_DEFINITIONS.deductions.name, relatedDeductionRows],
+    [SHEET_DEFINITIONS.employees.name, [rowNumber]],
+  ]));
+
+  return {
+    deletedEmployee: 1,
+    deletedRates: relatedRateRows.length,
+    deletedDeductions: relatedDeductionRows.length,
+  };
+}
+
+export async function deleteOrphanedAndDemoRecords() {
+  const [employees, rates, deductions] = await Promise.all([
+    readSheet("employees"),
+    readSheet("rates"),
+    readSheet("deductions"),
+  ]);
+  const employeeNumbers = new Set(
+    employees.records.map((record) => String(record.values["Employee Number"] ?? "").trim()).filter(Boolean)
+  );
+  const demoNames = new Set(["Jordan Adams", "Taylor Brooks", "Morgan Chen", "New Employee Example"]);
+  const rowsToDelete = (records: SheetRecord[]) => records
+    .filter((record) => {
+      const employeeNumber = String(record.values["Employee Number"] ?? "").trim();
+      const employeeName = String(record.values["Employee Name"] ?? "").trim();
+      return !employeeNumber || !employeeNumbers.has(employeeNumber) || demoNames.has(employeeName);
+    })
+    .map((record) => record.rowNumber);
+
+  const rateRows = rowsToDelete(rates.records);
+  const deductionRows = rowsToDelete(deductions.records);
+  await deleteRows(new Map([
+    [SHEET_DEFINITIONS.rates.name, rateRows],
+    [SHEET_DEFINITIONS.deductions.name, deductionRows],
+  ]));
+
+  return { deletedRates: rateRows.length, deletedDeductions: deductionRows.length };
+}
+
 export async function testEmployeeSheetConnection(): Promise<EmployeeSheetConnection> {
   const employeeSheet = await readSheet("employees");
   const employeeCount = employeeSheet.records.filter(
