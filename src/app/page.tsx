@@ -8,7 +8,7 @@ import { PayrollUploadTable } from "@/components/payroll-upload-table";
 import { MasterSummaryTable } from "@/components/master-summary-table";
 import { ExportPanel } from "@/components/export-panel";
 import { GoogleSheetsStatus } from "@/components/google-sheets-status";
-import { EmployeeMaster, GOOGLE_SHEET_URL } from "@/components/employee-master";
+import { EmployeeMaster } from "@/components/employee-master";
 
 type AppView = "payroll" | "employees";
 
@@ -45,14 +45,6 @@ function PayrollApp() {
               >
                 Payroll Records
               </button>
-              <a
-                href={GOOGLE_SHEET_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-lg border border-white/15 px-3 py-2 text-sm font-semibold text-gray-300 hover:border-[#78BE20] hover:text-[#9AD94A]"
-              >
-                Google Sheet ↗
-              </a>
             </nav>
 
             <div className="lg:ml-2">
