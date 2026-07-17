@@ -4,16 +4,27 @@ import { usePayroll } from "@/lib/payroll-context";
 import { exportPayrollUpload, exportMasterSummary, downloadWorkbook } from "@/lib/export-xlsx";
 
 export function ExportPanel() {
-  const { payrollUploadRows, masterSummaryGroups, payrollDate, setCurrentStep } = usePayroll();
+  const {
+    payrollUploadRows,
+    masterSummaryGroups,
+    payrollDate,
+    exportedPayrollUpload,
+    exportedMasterSummary,
+    setCurrentStep,
+    markPayrollUploadExported,
+    markMasterSummaryExported,
+  } = usePayroll();
 
   const handleExportPayrollUpload = () => {
     const wb = exportPayrollUpload(payrollUploadRows);
     downloadWorkbook(wb, `payroll_upload_${payrollDate.replace(/\s+/g, "_") || "export"}.xlsx`);
+    markPayrollUploadExported();
   };
 
   const handleExportMasterSummary = () => {
     const wb = exportMasterSummary(masterSummaryGroups, payrollDate);
     downloadWorkbook(wb, `master_summary_${payrollDate.replace(/\s+/g, "_") || "export"}.xlsx`);
+    markMasterSummaryExported();
   };
 
   const hasData = payrollUploadRows.length > 0;
@@ -44,7 +55,7 @@ export function ExportPanel() {
               onClick={handleExportPayrollUpload}
               className="w-full rounded-lg bg-[#78BE20] px-4 py-2 text-sm font-bold text-[#111312] hover:bg-[#69A91B]"
             >
-              Download Payroll Upload (.xlsx)
+              {exportedPayrollUpload ? "Downloaded Payroll Upload" : "Download Payroll Upload (.xlsx)"}
             </button>
           </div>
 
@@ -59,7 +70,7 @@ export function ExportPanel() {
               disabled={masterSummaryGroups.length === 0}
               className="w-full rounded-lg bg-[#78BE20] px-4 py-2 text-sm font-bold text-[#111312] hover:bg-[#69A91B] disabled:cursor-not-allowed disabled:bg-gray-300"
             >
-              Download Master Summary (.xlsx)
+              {exportedMasterSummary ? "Downloaded Master Summary" : "Download Master Summary (.xlsx)"}
             </button>
           </div>
         </div>

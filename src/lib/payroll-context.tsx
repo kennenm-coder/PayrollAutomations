@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from "react";
 import type {
   TSheetRow,
   PayrollUploadRow,
@@ -20,6 +27,8 @@ interface PayrollState {
   configurationIssues: PayrollConfigurationIssue[];
   payrollDate: string;
   currentStep: number;
+  exportedPayrollUpload: boolean;
+  exportedMasterSummary: boolean;
 }
 
 interface PayrollActions {
@@ -34,25 +43,80 @@ interface PayrollActions {
   setCurrentStep: (step: number) => void;
   generatePayrollUpload: () => void;
   generateMasterSummary: () => void;
+  markPayrollUploadExported: () => void;
+  markMasterSummaryExported: () => void;
 }
 
 const PayrollContext = createContext<(PayrollState & PayrollActions) | null>(null);
+const SESSION_STORAGE_KEY = "rba-payroll-run-draft-v1";
+
+const INITIAL_PAYROLL_STATE: PayrollState = {
+  tsheetRows: [],
+  payrollUploadRows: [],
+  masterSummaryGroups: [],
+  bonuses: {},
+  commissions: {},
+  employeeConfigs: {},
+  configurationIssues: [],
+  payrollDate: "",
+  currentStep: 0,
+  exportedPayrollUpload: false,
+  exportedMasterSummary: false,
+};
 
 export function PayrollProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<PayrollState>({
-    tsheetRows: [],
-    payrollUploadRows: [],
-    masterSummaryGroups: [],
-    bonuses: {},
-    commissions: {},
-    employeeConfigs: {},
-    configurationIssues: [],
-    payrollDate: "",
-    currentStep: 0,
-  });
+  const [state, setState] = useState<PayrollState>(INITIAL_PAYROLL_STATE);
+  const [sessionRestored, setSessionRestored] = useState(false);
+
+  useEffect(() => {
+    const restoreDraft = window.setTimeout(() => {
+      try {
+        const savedDraft = sessionStorage.getItem(SESSION_STORAGE_KEY);
+        if (savedDraft) {
+          const restored = JSON.parse(savedDraft) as Partial<PayrollState>;
+          setState({ ...INITIAL_PAYROLL_STATE, ...restored });
+        }
+      } catch {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      } finally {
+        setSessionRestored(true);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(restoreDraft);
+  }, []);
+
+  useEffect(() => {
+    if (!sessionRestored) return;
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(state));
+  }, [sessionRestored, state]);
+
+  useEffect(() => {
+    const payrollIsUnfinished =
+      state.tsheetRows.length > 0 &&
+      !(state.exportedPayrollUpload && state.exportedMasterSummary);
+    if (!payrollIsUnfinished) return;
+
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = true;
+    };
+
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, [state.exportedMasterSummary, state.exportedPayrollUpload, state.tsheetRows.length]);
 
   const setTSheetRows = useCallback((rows: TSheetRow[]) => {
-    setState((s) => ({ ...s, tsheetRows: rows }));
+    setState((s) => ({
+      ...s,
+      tsheetRows: rows,
+      payrollUploadRows: [],
+      masterSummaryGroups: [],
+      bonuses: {},
+      commissions: {},
+      exportedPayrollUpload: false,
+      exportedMasterSummary: false,
+    }));
   }, []);
 
   const setBonus = useCallback((employeeNumber: string, amount: number) => {
@@ -104,6 +168,14 @@ export function PayrollProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const markPayrollUploadExported = useCallback(() => {
+    setState((s) => ({ ...s, exportedPayrollUpload: true }));
+  }, []);
+
+  const markMasterSummaryExported = useCallback(() => {
+    setState((s) => ({ ...s, exportedMasterSummary: true }));
+  }, []);
+
   return (
     <PayrollContext.Provider
       value={{
@@ -116,6 +188,8 @@ export function PayrollProvider({ children }: { children: ReactNode }) {
         setCurrentStep,
         generatePayrollUpload,
         generateMasterSummary,
+        markPayrollUploadExported,
+        markMasterSummaryExported,
       }}
     >
       {children}
