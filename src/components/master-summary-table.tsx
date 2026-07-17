@@ -29,17 +29,20 @@ export function MasterSummaryTable() {
     );
   }
 
-  let grandTotalGross = 0;
-  let grandTotal = 0;
+  const grandTotalGross = masterSummaryGroups.reduce(
+    (total, group) => total + group.employees.reduce((sum, employee) => sum + employee.grossPay, 0),
+    0
+  );
+  const grandTotal = masterSummaryGroups.reduce(
+    (total, group) => total + group.employees.reduce((sum, employee) => sum + employee.total, 0),
+    0
+  );
 
   return (
     <div className="space-y-8">
       {masterSummaryGroups.map((group) => {
         const sectionGross = group.employees.reduce((s, e) => s + e.grossPay, 0);
         const sectionTotal = group.employees.reduce((s, e) => s + e.total, 0);
-        grandTotalGross += sectionGross;
-        grandTotal += sectionTotal;
-
         return (
           <div key={group.section} className="border rounded-lg overflow-hidden">
             <div className="bg-gray-800 text-white px-4 py-2 font-semibold text-sm">

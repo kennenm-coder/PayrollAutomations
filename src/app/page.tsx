@@ -6,6 +6,7 @@ import { CSVUpload } from "@/components/csv-upload";
 import { PayrollUploadTable } from "@/components/payroll-upload-table";
 import { MasterSummaryTable } from "@/components/master-summary-table";
 import { ExportPanel } from "@/components/export-panel";
+import { GoogleSheetsStatus } from "@/components/google-sheets-status";
 
 function PayrollApp() {
   const { currentStep } = usePayroll();
@@ -18,6 +19,7 @@ function PayrollApp() {
             <h1 className="text-xl font-bold text-gray-900">RBA Payroll Automations</h1>
             <p className="text-sm text-gray-500">Renewal by Andersen NWO</p>
           </div>
+          <GoogleSheetsStatus />
         </div>
       </header>
 

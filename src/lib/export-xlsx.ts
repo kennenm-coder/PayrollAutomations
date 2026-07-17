@@ -4,10 +4,6 @@ import type { PayrollUploadRow, DepartmentGroup } from "./types";
 export function exportPayrollUpload(rows: PayrollUploadRow[]): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
 
-  const hourly = rows.filter((_, i) => {
-    return true; // all rows go to one sheet; split handled by caller if needed
-  });
-
   const headers = [
     "Payroll ID", "Employee Number", "Name", "Reg Hours", "Time at 1.5",
     "Bereavement Hours", "Holiday Hours", "PTO Payout Hours",

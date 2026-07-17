@@ -1,7 +1,6 @@
 "use client";
 
 import { usePayroll } from "@/lib/payroll-context";
-import { toPayrollUpload } from "@/lib/transform";
 import { useMemo } from "react";
 
 export function PayrollUploadTable() {
@@ -18,11 +17,6 @@ export function PayrollUploadTable() {
   const salariedRows = useMemo(
     () => tsheetRows.filter((r) => r.salaried),
     [tsheetRows]
-  );
-
-  const uploadPreview = useMemo(
-    () => toPayrollUpload(tsheetRows, bonuses, commissions),
-    [tsheetRows, bonuses, commissions]
   );
 
   const handleContinue = () => {
