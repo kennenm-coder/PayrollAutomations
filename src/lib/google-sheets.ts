@@ -224,6 +224,11 @@ export async function deleteEmployeeAndRelatedRecords(rowNumber: number, employe
   };
 }
 
+export async function deleteSheetRecord(sheetKey: "rates" | "deductions", rowNumber: number) {
+  if (!Number.isInteger(rowNumber) || rowNumber < 2) throw new Error("Invalid row deletion request.");
+  await deleteRows(new Map([[SHEET_DEFINITIONS[sheetKey].name, [rowNumber]]]));
+}
+
 export async function deleteOrphanedAndDemoRecords() {
   const [employees, rates, deductions] = await Promise.all([
     readSheet("employees"),

@@ -2,6 +2,7 @@ import { isPayrollAdmin } from "@/lib/admin-auth";
 import {
   appendSheetRow,
   deleteEmployeeAndRelatedRecords,
+  deleteSheetRecord,
   readSheet,
   updateSheetRow,
 } from "@/lib/google-sheets";
@@ -82,18 +83,21 @@ export async function POST(request: Request, context: RouteParams) {
 export async function DELETE(request: Request, context: RouteParams) {
   const access = await authorizedSheet(context);
   if (!access.ok) return errorResponse(access.error);
-  if (access.sheet !== "employees") {
-    return Response.json({ message: "Only employees can be deleted here." }, { status: 405 });
-  }
-
   const body = (await request.json().catch(() => null)) as
     | { rowNumber?: number; employeeNumber?: string }
     | null;
-  if (!body?.rowNumber || !body.employeeNumber) {
-    return Response.json({ message: "Invalid employee deletion." }, { status: 400 });
+  if (!body?.rowNumber) {
+    return Response.json({ message: "Invalid row deletion." }, { status: 400 });
   }
 
   try {
+    if (access.sheet !== "employees") {
+      await deleteSheetRecord(access.sheet, body.rowNumber);
+      return Response.json({ deleted: true });
+    }
+    if (!body.employeeNumber) {
+      return Response.json({ message: "Employee number is required." }, { status: 400 });
+    }
     return Response.json(
       await deleteEmployeeAndRelatedRecords(body.rowNumber, body.employeeNumber)
     );

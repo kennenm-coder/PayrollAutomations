@@ -46,6 +46,13 @@ function displayValue(value: SheetCellValue) {
   return String(value);
 }
 
+function formatMoney(value: SheetCellValue) {
+  const amount = Number(value ?? 0);
+  return Number.isFinite(amount)
+    ? amount.toLocaleString("en-US", { style: "currency", currency: "USD" })
+    : "$0.00";
+}
+
 function inputType(header: string) {
   if (header.includes("Date") || header === "Last Updated") return "date";
   if (header === "Amount") return "number";
@@ -179,6 +186,7 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
   const [editor, setEditor] = useState<EditorState>(null);
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
 
   const loadRecords = useCallback(async (sheet: SheetKey) => {
     const response = await fetch(`/api/google-sheets/${sheet}`, { cache: "no-store" });
@@ -246,6 +254,25 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
     );
   }, [displayedRecords, search]);
 
+  const deductionGroups = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return employeeRecords.flatMap((employee) => {
+      const employeeNumber = String(employee.values["Employee Number"] ?? "").trim();
+      const employeeName = String(employee.values["Employee Name"] ?? "").trim();
+      const deductions = records.filter(
+        (record) => String(record.values["Employee Number"] ?? "").trim() === employeeNumber
+      );
+      const searchable = [
+        employeeNumber,
+        employeeName,
+        ...deductions.flatMap((record) => Object.values(record.values).map(displayValue)),
+      ].join(" ").toLowerCase();
+      return !query || searchable.includes(query)
+        ? [{ employee, employeeNumber, employeeName, deductions }]
+        : [];
+    });
+  }, [employeeRecords, records, search]);
+
   const changeSheet = (sheet: SheetKey) => {
     setActiveSheet(sheet);
     setRecords([]);
@@ -264,6 +291,24 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
       }),
     });
     setSavedMessage("");
+  };
+
+  const addDeductionForEmployee = (employee: SheetRecord) => {
+    const headers = SHEET_DEFINITIONS.deductions.headers;
+    const values = blankValues("deductions");
+    values[headers.indexOf("Employee Number")] = String(employee.values["Employee Number"] ?? "");
+    values[headers.indexOf("Employee Name")] = String(employee.values["Employee Name"] ?? "");
+    setEditor({ values });
+    setSavedMessage("");
+  };
+
+  const toggleEmployee = (employeeNumber: string) => {
+    setExpandedEmployees((current) => {
+      const next = new Set(current);
+      if (next.has(employeeNumber)) next.delete(employeeNumber);
+      else next.add(employeeNumber);
+      return next;
+    });
   };
 
   const saveRecord = async (event: FormEvent) => {
@@ -319,6 +364,29 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
       setSavedMessage("Employee and related payroll rows deleted");
     } else {
       setError(result.message ?? "Unable to delete employee.");
+    }
+    setSaving(false);
+  };
+
+  const deleteDetailRecord = async () => {
+    if (!editor?.rowNumber || activeSheet === "employees") return;
+    if (!window.confirm(`Delete this ${SHEET_DEFINITIONS[activeSheet].singular.toLowerCase()}?`)) return;
+
+    setSaving(true);
+    const response = await fetch(`/api/google-sheets/${activeSheet}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rowNumber: editor.rowNumber }),
+    });
+    const result = (await response.json()) as { message?: string };
+    if (response.ok) {
+      const nextView = await loadView(activeSheet);
+      setRecords(nextView.currentRecords);
+      setEmployeeRecords(nextView.employees);
+      setEditor(null);
+      setSavedMessage(`${SHEET_DEFINITIONS[activeSheet].singular} deleted`);
+    } else {
+      setError(result.message ?? "Unable to delete this row.");
     }
     setSaving(false);
   };
@@ -385,13 +453,15 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
             placeholder={`Search ${definition.name.toLowerCase()}…`}
             className="min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#78BE20] md:w-64"
           />
-          <button
-            type="button"
-            onClick={() => setEditor({ values: blankValues(activeSheet) })}
-            className="whitespace-nowrap rounded-lg bg-[#78BE20] px-4 py-2 text-sm font-bold text-[#111312] hover:bg-[#69A91B]"
-          >
-            + Add {definition.singular}
-          </button>
+          {activeSheet !== "deductions" && (
+            <button
+              type="button"
+              onClick={() => setEditor({ values: blankValues(activeSheet) })}
+              className="whitespace-nowrap rounded-lg bg-[#78BE20] px-4 py-2 text-sm font-bold text-[#111312] hover:bg-[#69A91B]"
+            >
+              + Add {definition.singular}
+            </button>
+          )}
         </div>
       </div>
 
@@ -416,11 +486,84 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-200 bg-[#F7F8F6] px-4 py-3">
-          <span className="text-sm font-semibold text-[#202322]">{filteredRecords.length} {activeSheet === "employees" ? "employees" : "employee records"}</span>
-          <span className="text-xs text-gray-500">Click a row to edit</span>
+          <span className="text-sm font-semibold text-[#202322]">
+            {activeSheet === "deductions" ? deductionGroups.length : filteredRecords.length} {activeSheet === "employees" ? "employees" : "employee records"}
+          </span>
+          <span className="text-xs text-gray-500">{activeSheet === "deductions" ? "Click an employee to expand" : "Click a row to edit"}</span>
         </div>
         {loading ? (
           <div className="p-10 text-center text-sm text-gray-500">Loading {definition.name.toLowerCase()}…</div>
+        ) : activeSheet === "deductions" ? (
+          <div className="divide-y divide-gray-100">
+            {deductionGroups.map(({ employee, employeeNumber, employeeName, deductions }) => {
+              const expanded = expandedEmployees.has(employeeNumber);
+              return (
+                <div key={employeeNumber}>
+                  <div className="grid grid-cols-[2rem_minmax(10rem,1fr)_8rem_auto] items-center gap-3 px-4 py-3 hover:bg-[#F4F9EE]">
+                    <button
+                      type="button"
+                      onClick={() => toggleEmployee(employeeNumber)}
+                      className="flex h-7 w-7 items-center justify-center rounded-md bg-[#202322] text-sm font-bold text-white"
+                      aria-label={`${expanded ? "Collapse" : "Expand"} ${employeeName}`}
+                    >
+                      {expanded ? "-" : "+"}
+                    </button>
+                    <button type="button" onClick={() => toggleEmployee(employeeNumber)} className="min-w-0 text-left">
+                      <span className="block truncate font-semibold text-[#202322]">{employeeName}</span>
+                      <span className="text-xs text-gray-500">Employee #{employeeNumber}</span>
+                    </button>
+                    <span className={`rounded-full px-2.5 py-1 text-center text-xs font-semibold ${deductions.length ? "bg-[#E7F4D7] text-[#36580B]" : "bg-gray-100 text-gray-500"}`}>
+                      {deductions.length} {deductions.length === 1 ? "item" : "items"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => addDeductionForEmployee(employee)}
+                      className="rounded-lg border border-[#78BE20] px-3 py-2 text-xs font-bold text-[#36580B] hover:bg-white"
+                    >
+                      + Add deduction
+                    </button>
+                  </div>
+
+                  {expanded && (
+                    <div className="border-t border-gray-100 bg-[#FAFBF9] px-4 py-3 pl-12">
+                      {deductions.length === 0 ? (
+                        <p className="py-3 text-sm text-gray-500">No deductions or reimbursements configured.</p>
+                      ) : (
+                        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+                          <table className="min-w-full text-sm">
+                            <thead className="bg-gray-100 text-xs text-gray-600">
+                              <tr>
+                                <th className="px-3 py-2 text-left">Type</th>
+                                <th className="px-3 py-2 text-left">Description</th>
+                                <th className="px-3 py-2 text-right">Amount</th>
+                                <th className="px-3 py-2 text-left">Effective</th>
+                                <th className="px-3 py-2 text-left">Active</th>
+                                <th className="px-3 py-2 text-right">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {deductions.map((deduction) => (
+                                <tr key={deduction.rowNumber}>
+                                  <td className="px-3 py-2 font-semibold text-[#202322]">{displayValue(deduction.values.Type)}</td>
+                                  <td className="px-3 py-2 text-gray-600">{displayValue(deduction.values.Description)}</td>
+                                  <td className="px-3 py-2 text-right font-semibold">{formatMoney(deduction.values.Amount)}</td>
+                                  <td className="px-3 py-2 text-gray-600">{displayValue(deduction.values["Effective Date"])}</td>
+                                  <td className="px-3 py-2 text-gray-600">{displayValue(deduction.values.Active)}</td>
+                                  <td className="px-3 py-2 text-right">
+                                    <button type="button" onClick={() => editRecord(deduction)} className="font-semibold text-[#4F7F13]">Edit</button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
@@ -486,6 +629,9 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
               <div className="sticky bottom-0 flex flex-wrap gap-3 border-t border-gray-200 bg-white px-6 py-4">
                 {activeSheet === "employees" && editor.rowNumber && (
                   <button type="button" onClick={() => void deleteEmployee()} disabled={saving} className="rounded-lg border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">Delete employee</button>
+                )}
+                {activeSheet !== "employees" && editor.rowNumber && (
+                  <button type="button" onClick={() => void deleteDetailRecord()} disabled={saving} className="rounded-lg border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">Delete {definition.singular.toLowerCase()}</button>
                 )}
                 <button type="button" onClick={() => setEditor(null)} className="min-w-28 flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold hover:bg-gray-50">Cancel</button>
                 <button type="submit" disabled={saving} className="min-w-40 flex-1 rounded-lg bg-[#78BE20] px-4 py-2.5 text-sm font-bold text-[#111312] hover:bg-[#69A91B] disabled:opacity-50">
