@@ -40,7 +40,7 @@ export function exportMasterSummary(groups: DepartmentGroup[], payrollDate: stri
     "Name", "Pay Type", "Base Rate", "Hours", "REG", "OT",
     "Vac Hours", "Vac Pay", "Hol Hours", "Hol Pay", "Bonus", "Commission",
     "Reg Hours", "OT", "Gross Pay", "",
-    "Health Ins", "Dental/Vision Ins.", "Other Ins.", "Reimb.", "401(k)", "Garnish", "Total",
+    "Health Ins", "Dental/Vision Ins.", "Other Ins.", "Reimb.", "401(k)", "Garnish", "Expected Before Taxes",
   ];
 
   for (const group of groups) {

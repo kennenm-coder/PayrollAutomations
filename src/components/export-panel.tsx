@@ -37,7 +37,7 @@ export function ExportPanel() {
           <div className="border rounded-lg p-6 hover:shadow-md transition-shadow">
             <h3 className="font-semibold mb-2">Payroll Upload File</h3>
             <p className="text-sm text-gray-500 mb-4">
-              Hours data split by hourly/salaried with bonus and commission columns.
+              All employee hours with bonus and eligible commission columns.
               {payrollUploadRows.length} employees.
             </p>
             <button

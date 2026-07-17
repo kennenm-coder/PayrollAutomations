@@ -84,6 +84,41 @@ export interface DepartmentGroup {
   employees: MasterSummaryRow[];
 }
 
+export type PayrollDeductionType =
+  | "Health"
+  | "Dental/Vision"
+  | "Other Insurance"
+  | "Retirement"
+  | "Garnishment"
+  | "Reimbursement"
+  | "Other";
+
+export interface PayrollDeductionConfig {
+  type: PayrollDeductionType;
+  description: string;
+  amount: number;
+}
+
+export interface PayrollEmployeeConfig {
+  employeeNumber: string;
+  payrollId: string;
+  name: string;
+  active: boolean;
+  status: string;
+  department: DepartmentSection | "";
+  payType: "Hourly" | "Salary" | "";
+  commissionEligible: boolean;
+  rateType: "Hourly" | "Salary Per Pay Period" | "";
+  rateAmount: number | null;
+  deductions: PayrollDeductionConfig[];
+}
+
+export interface PayrollConfigurationIssue {
+  employeeNumber: string;
+  employeeName: string;
+  message: string;
+}
+
 export interface EmployeeConfig {
   name: string;
   payrollId: string;

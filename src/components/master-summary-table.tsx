@@ -112,7 +112,7 @@ export function MasterSummaryTable() {
         <span>GRAND TOTAL</span>
         <div className="flex gap-8">
           <span>Gross: {fmtCurrency(grandTotalGross)}</span>
-          <span>Net: {fmtCurrency(grandTotal)}</span>
+          <span>Expected Before Taxes: {fmtCurrency(grandTotal)}</span>
         </div>
       </div>
 

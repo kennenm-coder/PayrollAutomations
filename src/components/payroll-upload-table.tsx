@@ -5,18 +5,18 @@ import { useMemo } from "react";
 
 export function PayrollUploadTable() {
   const {
-    tsheetRows, bonuses, commissions,
+    tsheetRows, bonuses, commissions, employeeConfigs,
     setBonus, setCommission, setCurrentStep,
     generatePayrollUpload,
   } = usePayroll();
 
   const hourlyRows = useMemo(
-    () => tsheetRows.filter((r) => !r.salaried),
-    [tsheetRows]
+    () => tsheetRows.filter((r) => employeeConfigs[r.employeeNumber]?.payType === "Hourly"),
+    [employeeConfigs, tsheetRows]
   );
   const salariedRows = useMemo(
-    () => tsheetRows.filter((r) => r.salaried),
-    [tsheetRows]
+    () => tsheetRows.filter((r) => employeeConfigs[r.employeeNumber]?.payType === "Salary"),
+    [employeeConfigs, tsheetRows]
   );
 
   const handleContinue = () => {
@@ -36,6 +36,7 @@ export function PayrollUploadTable() {
             <tr>
               <th className="px-2 py-2 text-left font-medium text-gray-700">ID</th>
               <th className="px-2 py-2 text-left font-medium text-gray-700">Name</th>
+              <th className="px-2 py-2 text-right font-medium text-gray-700">Rate</th>
               <th className="px-2 py-2 text-right font-medium text-gray-700">Reg Hrs</th>
               <th className="px-2 py-2 text-right font-medium text-gray-700">OT</th>
               <th className="px-2 py-2 text-right font-medium text-gray-700">Holiday</th>
@@ -52,6 +53,9 @@ export function PayrollUploadTable() {
               <tr key={row.employeeNumber} className="hover:bg-gray-50">
                 <td className="px-2 py-1.5 text-gray-600">{row.payrollId}</td>
                 <td className="px-2 py-1.5 font-medium">{row.name}</td>
+                <td className="px-2 py-1.5 text-right font-medium">
+                  ${employeeConfigs[row.employeeNumber]?.rateAmount?.toFixed(2)}
+                </td>
                 <td className="px-2 py-1.5 text-right">{row.regHours.toFixed(2)}</td>
                 <td className="px-2 py-1.5 text-right">{row.otHours || ""}</td>
                 <td className="px-2 py-1.5 text-right">{row.holidayHours || ""}</td>
@@ -70,14 +74,16 @@ export function PayrollUploadTable() {
                   />
                 </td>
                 <td className="px-2 py-1.5 bg-yellow-50">
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-20 px-1 py-0.5 border rounded text-right text-xs"
-                    value={commissions[row.employeeNumber] || ""}
-                    onChange={(e) => setCommission(row.employeeNumber, parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                  />
+                  {employeeConfigs[row.employeeNumber]?.commissionEligible ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="w-20 px-1 py-0.5 border rounded text-right text-xs"
+                      value={commissions[row.employeeNumber] || ""}
+                      onChange={(e) => setCommission(row.employeeNumber, parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                    />
+                  ) : <span className="text-gray-400">Not eligible</span>}
                 </td>
               </tr>
             ))}
@@ -98,7 +104,8 @@ export function PayrollUploadTable() {
                 <tr>
                   <th className="px-2 py-2 text-left font-medium text-gray-700">ID</th>
                   <th className="px-2 py-2 text-left font-medium text-gray-700">Name</th>
-                  <th className="px-2 py-2 text-left font-medium text-gray-700">Group</th>
+                  <th className="px-2 py-2 text-right font-medium text-gray-700">Pay Period Salary</th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-700">Department</th>
                   <th className="px-2 py-2 text-right font-medium text-gray-700">Holiday</th>
                   <th className="px-2 py-2 text-right font-medium text-gray-700">Paid Day Off</th>
                   <th className="px-2 py-2 text-right font-medium text-gray-700 bg-yellow-50">Bonus</th>
@@ -110,7 +117,12 @@ export function PayrollUploadTable() {
                   <tr key={row.employeeNumber} className="hover:bg-gray-50">
                     <td className="px-2 py-1.5 text-gray-600">{row.payrollId}</td>
                     <td className="px-2 py-1.5 font-medium">{row.name}</td>
-                    <td className="px-2 py-1.5 text-gray-500">{row.group}</td>
+                    <td className="px-2 py-1.5 text-right font-medium">
+                      ${employeeConfigs[row.employeeNumber]?.rateAmount?.toFixed(2)}
+                    </td>
+                    <td className="px-2 py-1.5 text-gray-500">
+                      {employeeConfigs[row.employeeNumber]?.department}
+                    </td>
                     <td className="px-2 py-1.5 text-right">{row.holidayHours || ""}</td>
                     <td className="px-2 py-1.5 text-right">{row.requestedDayOffPaid || ""}</td>
                     <td className="px-2 py-1.5 bg-yellow-50">
@@ -124,14 +136,16 @@ export function PayrollUploadTable() {
                       />
                     </td>
                     <td className="px-2 py-1.5 bg-yellow-50">
-                      <input
-                        type="number"
-                        step="0.01"
-                        className="w-20 px-1 py-0.5 border rounded text-right text-xs"
-                        value={commissions[row.employeeNumber] || ""}
-                        onChange={(e) => setCommission(row.employeeNumber, parseFloat(e.target.value) || 0)}
-                        placeholder="0.00"
-                      />
+                      {employeeConfigs[row.employeeNumber]?.commissionEligible ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="w-20 px-1 py-0.5 border rounded text-right text-xs"
+                          value={commissions[row.employeeNumber] || ""}
+                          onChange={(e) => setCommission(row.employeeNumber, parseFloat(e.target.value) || 0)}
+                          placeholder="0.00"
+                        />
+                      ) : <span className="text-gray-400">Not eligible</span>}
                     </td>
                   </tr>
                 ))}

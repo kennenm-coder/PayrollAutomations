@@ -1,56 +1,83 @@
-import type { TSheetRow, PayrollUploadRow, MasterSummaryRow, DepartmentGroup } from "./types";
-import { mapGroupToDepartment, DEPARTMENT_ORDER } from "./group-mapping";
+import type {
+  TSheetRow,
+  PayrollUploadRow,
+  MasterSummaryRow,
+  DepartmentGroup,
+  PayrollEmployeeConfig,
+} from "./types";
+import { DEPARTMENT_ORDER } from "./group-mapping";
 
 export function toPayrollUpload(
   rows: TSheetRow[],
   bonuses: Record<string, number>,
-  commissions: Record<string, number>
+  commissions: Record<string, number>,
+  employeeConfigs: Record<string, PayrollEmployeeConfig>
 ): PayrollUploadRow[] {
-  return rows.map((r) => ({
-    payrollId: r.payrollId,
-    employeeNumber: r.employeeNumber,
-    name: r.name,
-    regHours: r.regHours,
-    otHours: r.otHours,
-    bereavementHours: r.bereavementHours,
-    holidayHours: r.holidayHours,
-    ptoPayout: r.ptoPayout,
-    requestedDayOffPaid: r.requestedDayOffPaid,
-    vacationHours: r.vacationHours,
-    militaryLeaveUnpaid: r.militaryLeaveUnpaid,
-    personalUnpaid: r.personalUnpaid,
-    requestedDayOffUnpaid: r.requestedDayOffUnpaid,
-    sickUnpaid: r.sickUnpaid,
-    bonus: bonuses[r.employeeNumber] ?? 0,
-    commission: commissions[r.employeeNumber] ?? 0,
-  }));
+  return rows.map((r) => {
+    const config = employeeConfigs[r.employeeNumber];
+    return {
+      payrollId: config?.payrollId || r.payrollId,
+      employeeNumber: r.employeeNumber,
+      name: config?.name || r.name,
+      regHours: r.regHours,
+      otHours: r.otHours,
+      bereavementHours: r.bereavementHours,
+      holidayHours: r.holidayHours,
+      ptoPayout: r.ptoPayout,
+      requestedDayOffPaid: r.requestedDayOffPaid,
+      vacationHours: r.vacationHours,
+      militaryLeaveUnpaid: r.militaryLeaveUnpaid,
+      personalUnpaid: r.personalUnpaid,
+      requestedDayOffUnpaid: r.requestedDayOffUnpaid,
+      sickUnpaid: r.sickUnpaid,
+      bonus: bonuses[r.employeeNumber] ?? 0,
+      commission: config?.commissionEligible ? commissions[r.employeeNumber] ?? 0 : 0,
+    };
+  });
+}
+
+function deductionTotals(config: PayrollEmployeeConfig) {
+  const totals = {
+    healthIns: 0,
+    dentalIns: 0,
+    otherIns: 0,
+    reimb: 0,
+    fourOhOneK: 0,
+    garnish: 0,
+  };
+
+  for (const deduction of config.deductions) {
+    if (deduction.type === "Health") totals.healthIns += deduction.amount;
+    else if (deduction.type === "Dental/Vision") totals.dentalIns += deduction.amount;
+    else if (deduction.type === "Retirement") totals.fourOhOneK += deduction.amount;
+    else if (deduction.type === "Garnishment") totals.garnish += deduction.amount;
+    else if (deduction.type === "Reimbursement") totals.reimb += deduction.amount;
+    else totals.otherIns += deduction.amount;
+  }
+
+  return totals;
 }
 
 export function toMasterSummary(
   uploadRows: PayrollUploadRow[],
-  tsheetRows: TSheetRow[],
-  employeeRates: Record<string, number>,
-  deductions: Record<string, { healthIns: number; dentalIns: number; otherIns: number; reimb: number; fourOhOneK: number; garnish: number }>
+  employeeConfigs: Record<string, PayrollEmployeeConfig>
 ): DepartmentGroup[] {
-  const tsheetMap = new Map(tsheetRows.map((r) => [r.employeeNumber, r]));
-
   const groups = new Map<string, MasterSummaryRow[]>();
   DEPARTMENT_ORDER.forEach((d) => groups.set(d, []));
 
   for (const row of uploadRows) {
-    const tsheet = tsheetMap.get(row.employeeNumber);
-    if (!tsheet) continue;
+    const config = employeeConfigs[row.employeeNumber];
+    if (!config || !config.department || config.rateAmount === null) continue;
 
-    const dept = mapGroupToDepartment(tsheet.group, tsheet.salaried);
-    const rate = employeeRates[row.employeeNumber] ?? 0;
-    const ded = deductions[row.employeeNumber] ?? {
-      healthIns: 0, dentalIns: 0, otherIns: 0, reimb: 0, fourOhOneK: 0, garnish: 0,
-    };
+    const dept = config.department;
+    const rate = config.rateAmount;
+    const ded = deductionTotals(config);
+    const isSalary = config.payType === "Salary";
 
-    const regPay = row.regHours * rate;
-    const otPay = row.otHours * rate * 1.5;
-    const vacPay = row.vacationHours * rate;
-    const holPay = row.holidayHours * rate;
+    const regPay = isSalary ? rate : row.regHours * rate;
+    const otPay = isSalary ? 0 : row.otHours * rate * 1.5;
+    const vacPay = isSalary ? 0 : row.vacationHours * rate;
+    const holPay = isSalary ? 0 : row.holidayHours * rate;
     const totalHours = row.regHours + row.otHours;
 
     const grossPay = regPay + otPay + vacPay + holPay + row.bonus + row.commission;
@@ -59,7 +86,7 @@ export function toMasterSummary(
 
     const summaryRow: MasterSummaryRow = {
       name: row.name,
-      payType: tsheet.salaried ? "Salary" : "Hourly",
+      payType: config.payType,
       baseRate: rate,
       hours: totalHours,
       regPay,
