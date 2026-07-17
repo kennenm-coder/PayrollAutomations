@@ -43,7 +43,7 @@ function PayrollApp() {
                 onClick={() => setView("employees")}
                 className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${view === "employees" ? "bg-[#78BE20] text-[#111312]" : "text-gray-300 hover:bg-white/10 hover:text-white"}`}
               >
-                Employee Master
+                Payroll Records
               </button>
               <a
                 href={GOOGLE_SHEET_URL}

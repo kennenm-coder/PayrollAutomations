@@ -120,7 +120,7 @@ export function EmployeeMaster() {
   };
 
   if (session.state === "loading") {
-    return <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center text-gray-500">Loading employee master…</div>;
+    return <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center text-gray-500">Loading payroll records...</div>;
   }
 
   if (!session.configured) {
@@ -139,7 +139,7 @@ export function EmployeeMaster() {
     return (
       <div className="mx-auto max-w-md rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
         <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl bg-[#78BE20] text-lg font-black text-[#111312]">RBA</div>
-        <h2 className="text-2xl font-bold text-[#202322]">Employee Master</h2>
+        <h2 className="text-2xl font-bold text-[#202322]">Payroll Records</h2>
         <p className="mt-2 text-sm text-gray-500">Enter the accounting password to view or change employee data.</p>
         <form onSubmit={handleLogin} className="mt-6 space-y-4">
           <input
@@ -156,7 +156,7 @@ export function EmployeeMaster() {
             disabled={submitting || !password}
             className="w-full rounded-lg bg-[#78BE20] px-4 py-2.5 text-sm font-bold text-[#111312] hover:bg-[#69A91B] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {submitting ? "Signing in…" : "Open Employee Master"}
+            {submitting ? "Signing in..." : "Open Payroll Records"}
           </button>
         </form>
         <a href={GOOGLE_SHEET_URL} target="_blank" rel="noreferrer" className="mt-5 block text-center text-xs font-semibold text-gray-500 hover:text-[#4F7F13]">
@@ -267,7 +267,7 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
       <div className="flex flex-col gap-4 rounded-2xl bg-[#202322] p-5 text-white md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9AD94A]">Live Google Sheet</p>
-          <h2 className="mt-1 text-2xl font-bold">Employee Master</h2>
+          <h2 className="mt-1 text-2xl font-bold">Payroll Records</h2>
           <p className="mt-1 text-sm text-gray-300">Changes made here save directly to the shared workbook.</p>
         </div>
         <div className="flex flex-wrap gap-2">
