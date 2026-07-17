@@ -21,7 +21,7 @@ export function MasterSummaryTable() {
         <p>No data yet. Complete the previous steps first.</p>
         <button
           onClick={() => setCurrentStep(1)}
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md text-sm"
+          className="mt-4 rounded-lg bg-[#78BE20] px-4 py-2 text-sm font-bold text-[#111312]"
         >
           ← Back to Payroll Upload
         </button>
@@ -68,7 +68,7 @@ export function MasterSummaryTable() {
                     <th className="px-2 py-2 text-right font-medium">Dental</th>
                     <th className="px-2 py-2 text-right font-medium">401(k)</th>
                     <th className="px-2 py-2 text-right font-medium">Garnish</th>
-                    <th className="px-2 py-2 text-right font-medium bg-blue-50">Total</th>
+                    <th className="bg-[#F1F8E8] px-2 py-2 text-right font-medium">Expected</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -90,7 +90,7 @@ export function MasterSummaryTable() {
                       <td className="px-2 py-1.5 text-right">{fmtCurrency(emp.dentalIns)}</td>
                       <td className="px-2 py-1.5 text-right">{fmtCurrency(emp.fourOhOneK)}</td>
                       <td className="px-2 py-1.5 text-right">{fmtCurrency(emp.garnish)}</td>
-                      <td className="px-2 py-1.5 text-right bg-blue-50 font-medium">{fmtCurrency(emp.total)}</td>
+                      <td className="bg-[#F1F8E8] px-2 py-1.5 text-right font-medium">{fmtCurrency(emp.total)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -99,7 +99,7 @@ export function MasterSummaryTable() {
                     <td className="px-2 py-2" colSpan={11}>Subtotal</td>
                     <td className="px-2 py-2 text-right bg-green-100">{fmtCurrency(sectionGross)}</td>
                     <td colSpan={4} />
-                    <td className="px-2 py-2 text-right bg-blue-100">{fmtCurrency(sectionTotal)}</td>
+                    <td className="bg-[#DDEFC6] px-2 py-2 text-right">{fmtCurrency(sectionTotal)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -108,7 +108,7 @@ export function MasterSummaryTable() {
         );
       })}
 
-      <div className="bg-gray-900 text-white rounded-lg px-6 py-4 flex justify-between text-sm font-semibold">
+      <div className="flex justify-between rounded-xl border-l-4 border-[#78BE20] bg-[#202322] px-6 py-4 text-sm font-semibold text-white">
         <span>GRAND TOTAL</span>
         <div className="flex gap-8">
           <span>Gross: {fmtCurrency(grandTotalGross)}</span>
@@ -125,7 +125,7 @@ export function MasterSummaryTable() {
         </button>
         <button
           onClick={() => setCurrentStep(3)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+          className="rounded-lg bg-[#78BE20] px-4 py-2 text-sm font-bold text-[#111312] hover:bg-[#69A91B]"
         >
           Export to Excel →
         </button>

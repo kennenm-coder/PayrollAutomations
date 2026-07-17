@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "RBA Payroll Automations",
-  description: "Payroll processing tool for Renewal by Andersen NWO",
+  title: "Payroll Automations | Renewal by Andersen NWO",
+  description: "Internal payroll processing and employee management for Renewal by Andersen NWO",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

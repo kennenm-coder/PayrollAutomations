@@ -77,7 +77,7 @@ export function CSVUpload() {
       <div
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
-        className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-blue-400 transition-colors cursor-pointer"
+        className="cursor-pointer rounded-xl border-2 border-dashed border-gray-300 bg-[#FAFBF9] p-12 text-center transition-colors hover:border-[#78BE20] hover:bg-[#F5FAEF]"
         onClick={() => document.getElementById("csv-input")?.click()}
       >
         <input
@@ -115,7 +115,7 @@ export function CSVUpload() {
           </p>
           <button
             onClick={() => setCurrentStep(1)}
-            className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+            className="mt-3 rounded-lg bg-[#78BE20] px-4 py-2 text-sm font-bold text-[#111312] hover:bg-[#69A91B]"
           >
             Continue to Payroll Upload →
           </button>

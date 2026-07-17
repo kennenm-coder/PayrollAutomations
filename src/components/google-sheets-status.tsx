@@ -50,14 +50,14 @@ export function GoogleSheetsStatus() {
   };
 
   if (status.state === "loading") {
-    return <span className="text-xs text-gray-500">Checking employee sheet…</span>;
+    return <span className="text-xs text-gray-400">Checking employee sheet...</span>;
   }
 
   if (status.state === "connected") {
     return (
-      <span className="inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700">
-        <span className="h-2 w-2 rounded-full bg-green-500" />
-        Google Sheet connected · {status.employeeCount} employees
+      <span className="inline-flex items-center gap-2 rounded-full border border-[#78BE20]/30 bg-[#78BE20]/10 px-3 py-1.5 text-xs font-semibold text-[#B6E879]">
+        <span className="h-2 w-2 rounded-full bg-[#78BE20]" />
+        Sheet connected | {status.employeeCount} employees
       </span>
     );
   }
@@ -70,7 +70,7 @@ export function GoogleSheetsStatus() {
       className="inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
     >
       <span className="h-2 w-2 rounded-full bg-red-500" />
-      Sheet connection failed · Retry
+      Sheet connection failed | Retry
     </button>
   );
 }

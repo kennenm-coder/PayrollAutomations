@@ -27,7 +27,7 @@ export function ExportPanel() {
           <p>Complete the previous steps to enable exports.</p>
           <button
             onClick={() => setCurrentStep(0)}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md text-sm"
+            className="mt-4 rounded-lg bg-[#78BE20] px-4 py-2 text-sm font-bold text-[#111312]"
           >
             Start Over
           </button>
@@ -42,7 +42,7 @@ export function ExportPanel() {
             </p>
             <button
               onClick={handleExportPayrollUpload}
-              className="w-full px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700"
+              className="w-full rounded-lg bg-[#78BE20] px-4 py-2 text-sm font-bold text-[#111312] hover:bg-[#69A91B]"
             >
               Download Payroll Upload (.xlsx)
             </button>
@@ -57,7 +57,7 @@ export function ExportPanel() {
             <button
               onClick={handleExportMasterSummary}
               disabled={masterSummaryGroups.length === 0}
-              className="w-full px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="w-full rounded-lg bg-[#78BE20] px-4 py-2 text-sm font-bold text-[#111312] hover:bg-[#69A91B] disabled:cursor-not-allowed disabled:bg-gray-300"
             >
               Download Master Summary (.xlsx)
             </button>
