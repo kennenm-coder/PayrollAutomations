@@ -59,8 +59,12 @@ export function MasterSummaryTable() {
                     <th className="px-2 py-2 text-right font-medium">REG Pay</th>
                     <th className="px-2 py-2 text-right font-medium">OT Hrs</th>
                     <th className="px-2 py-2 text-right font-medium">OT Pay</th>
+                    <th className="px-2 py-2 text-right font-medium">PTO/Vac Hrs</th>
+                    <th className="px-2 py-2 text-right font-medium">PTO/Vac Pay</th>
                     <th className="px-2 py-2 text-right font-medium">Hol Hrs</th>
                     <th className="px-2 py-2 text-right font-medium">Hol Pay</th>
+                    <th className="px-2 py-2 text-right font-medium">Salary Unpaid Hrs</th>
+                    <th className="px-2 py-2 text-right font-medium">Salary Reduction</th>
                     <th className="px-2 py-2 text-right font-medium">Bonus</th>
                     <th className="px-2 py-2 text-right font-medium">Comm</th>
                     <th className="px-2 py-2 text-right font-medium bg-green-50">Gross Pay</th>
@@ -81,8 +85,16 @@ export function MasterSummaryTable() {
                       <td className="px-2 py-1.5 text-right">{fmtCurrency(emp.regPay)}</td>
                       <td className="px-2 py-1.5 text-right">{fmt(emp.otHours)}</td>
                       <td className="px-2 py-1.5 text-right">{fmtCurrency(emp.otPay)}</td>
+                      <td className="px-2 py-1.5 text-right">{fmt(emp.vacHours)}</td>
+                      <td className="px-2 py-1.5 text-right">{fmtCurrency(emp.vacPay)}</td>
                       <td className="px-2 py-1.5 text-right">{fmt(emp.holHours)}</td>
                       <td className="px-2 py-1.5 text-right">{fmtCurrency(emp.holPay)}</td>
+                      <td className="px-2 py-1.5 text-right">{fmt(emp.salaryUnpaidHours)}</td>
+                      <td className="px-2 py-1.5 text-right text-red-700">
+                        {emp.salaryUnpaidAdjustment
+                          ? `-${fmtCurrency(emp.salaryUnpaidAdjustment)}`
+                          : "-"}
+                      </td>
                       <td className="px-2 py-1.5 text-right">{fmtCurrency(emp.bonus)}</td>
                       <td className="px-2 py-1.5 text-right">{fmtCurrency(emp.commission)}</td>
                       <td className="px-2 py-1.5 text-right bg-green-50 font-medium">{fmtCurrency(emp.grossPay)}</td>
@@ -96,7 +108,7 @@ export function MasterSummaryTable() {
                 </tbody>
                 <tfoot className="bg-gray-100 font-semibold">
                   <tr>
-                    <td className="px-2 py-2" colSpan={11}>Subtotal</td>
+                    <td className="px-2 py-2" colSpan={15}>Subtotal</td>
                     <td className="px-2 py-2 text-right bg-green-100">{fmtCurrency(sectionGross)}</td>
                     <td colSpan={4} />
                     <td className="bg-[#DDEFC6] px-2 py-2 text-right">{fmtCurrency(sectionTotal)}</td>

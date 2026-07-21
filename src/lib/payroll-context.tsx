@@ -15,7 +15,7 @@ import type {
   PayrollEmployeeConfig,
   PayrollConfigurationIssue,
 } from "./types";
-import { toPayrollUpload, toMasterSummary } from "./transform";
+import { toPayrollUpload, toMasterSummary, totalUnpaidHours } from "./transform";
 
 interface PayrollState {
   tsheetRows: TSheetRow[];
@@ -23,18 +23,22 @@ interface PayrollState {
   masterSummaryGroups: DepartmentGroup[];
   bonuses: Record<string, number>;
   commissions: Record<string, number>;
+  salaryUnpaidHours: Record<string, number>;
   employeeConfigs: Record<string, PayrollEmployeeConfig>;
   configurationIssues: PayrollConfigurationIssue[];
   payrollDate: string;
   currentStep: number;
   exportedPayrollUpload: boolean;
   exportedMasterSummary: boolean;
+  payrollRunSaved: boolean;
+  payrollRunId: string;
 }
 
 interface PayrollActions {
   setTSheetRows: (rows: TSheetRow[]) => void;
   setBonus: (employeeNumber: string, amount: number) => void;
   setCommission: (employeeNumber: string, amount: number) => void;
+  setSalaryUnpaidHours: (employeeNumber: string, hours: number) => void;
   setPayrollConfiguration: (
     configs: Record<string, PayrollEmployeeConfig>,
     issues: PayrollConfigurationIssue[]
@@ -45,10 +49,11 @@ interface PayrollActions {
   generateMasterSummary: () => void;
   markPayrollUploadExported: () => void;
   markMasterSummaryExported: () => void;
+  markPayrollRunSaved: (runId: string) => void;
 }
 
 const PayrollContext = createContext<(PayrollState & PayrollActions) | null>(null);
-const SESSION_STORAGE_KEY = "rba-payroll-run-draft-v1";
+const SESSION_STORAGE_KEY = "rba-payroll-run-draft-v2";
 
 const INITIAL_PAYROLL_STATE: PayrollState = {
   tsheetRows: [],
@@ -56,12 +61,15 @@ const INITIAL_PAYROLL_STATE: PayrollState = {
   masterSummaryGroups: [],
   bonuses: {},
   commissions: {},
+  salaryUnpaidHours: {},
   employeeConfigs: {},
   configurationIssues: [],
   payrollDate: "",
   currentStep: 0,
   exportedPayrollUpload: false,
   exportedMasterSummary: false,
+  payrollRunSaved: false,
+  payrollRunId: "",
 };
 
 export function PayrollProvider({ children }: { children: ReactNode }) {
@@ -94,7 +102,7 @@ export function PayrollProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const payrollIsUnfinished =
       state.tsheetRows.length > 0 &&
-      !(state.exportedPayrollUpload && state.exportedMasterSummary);
+      !(state.exportedPayrollUpload && state.exportedMasterSummary && state.payrollRunSaved);
     if (!payrollIsUnfinished) return;
 
     const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
@@ -104,7 +112,12 @@ export function PayrollProvider({ children }: { children: ReactNode }) {
 
     window.addEventListener("beforeunload", warnBeforeLeaving);
     return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
-  }, [state.exportedMasterSummary, state.exportedPayrollUpload, state.tsheetRows.length]);
+  }, [
+    state.exportedMasterSummary,
+    state.exportedPayrollUpload,
+    state.payrollRunSaved,
+    state.tsheetRows.length,
+  ]);
 
   const setTSheetRows = useCallback((rows: TSheetRow[]) => {
     setState((s) => ({
@@ -112,10 +125,15 @@ export function PayrollProvider({ children }: { children: ReactNode }) {
       tsheetRows: rows,
       payrollUploadRows: [],
       masterSummaryGroups: [],
-      bonuses: {},
-      commissions: {},
+      bonuses: Object.fromEntries(rows.map((row) => [row.employeeNumber, row.bonus])),
+      commissions: Object.fromEntries(rows.map((row) => [row.employeeNumber, row.commission])),
+      salaryUnpaidHours: Object.fromEntries(
+        rows.map((row) => [row.employeeNumber, totalUnpaidHours(row)])
+      ),
       exportedPayrollUpload: false,
       exportedMasterSummary: false,
+      payrollRunSaved: false,
+      payrollRunId: "",
     }));
   }, []);
 
@@ -130,6 +148,13 @@ export function PayrollProvider({ children }: { children: ReactNode }) {
     setState((s) => ({
       ...s,
       commissions: { ...s.commissions, [employeeNumber]: amount },
+    }));
+  }, []);
+
+  const setSalaryUnpaidHours = useCallback((employeeNumber: string, hours: number) => {
+    setState((s) => ({
+      ...s,
+      salaryUnpaidHours: { ...s.salaryUnpaidHours, [employeeNumber]: Math.max(0, hours) },
     }));
   }, []);
 
@@ -154,6 +179,7 @@ export function PayrollProvider({ children }: { children: ReactNode }) {
         s.tsheetRows,
         s.bonuses,
         s.commissions,
+        s.salaryUnpaidHours,
         s.employeeConfigs
       );
       const groups = toMasterSummary(rows, s.employeeConfigs);
@@ -176,6 +202,10 @@ export function PayrollProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, exportedMasterSummary: true }));
   }, []);
 
+  const markPayrollRunSaved = useCallback((runId: string) => {
+    setState((s) => ({ ...s, payrollRunSaved: true, payrollRunId: runId }));
+  }, []);
+
   return (
     <PayrollContext.Provider
       value={{
@@ -183,6 +213,7 @@ export function PayrollProvider({ children }: { children: ReactNode }) {
         setTSheetRows,
         setBonus,
         setCommission,
+        setSalaryUnpaidHours,
         setPayrollConfiguration,
         setPayrollDate,
         setCurrentStep,
@@ -190,6 +221,7 @@ export function PayrollProvider({ children }: { children: ReactNode }) {
         generateMasterSummary,
         markPayrollUploadExported,
         markMasterSummaryExported,
+        markPayrollRunSaved,
       }}
     >
       {children}

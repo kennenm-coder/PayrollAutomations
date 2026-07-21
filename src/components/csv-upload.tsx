@@ -80,6 +80,8 @@ export function CSVUpload() {
     total: number;
     hourly: number;
     salaried: number;
+    importedBonuses: number;
+    importedCommissions: number;
   } | null>(null);
 
   const handleFile = useCallback((file: File) => {
@@ -132,6 +134,8 @@ export function CSVUpload() {
           total: rows.length,
           hourly: rows.filter((row) => configs[row.employeeNumber]?.payType === "Hourly").length,
           salaried: rows.filter((row) => configs[row.employeeNumber]?.payType === "Salary").length,
+          importedBonuses: rows.filter((row) => row.bonus !== 0).length,
+          importedCommissions: rows.filter((row) => row.commission !== 0).length,
         });
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : "Failed to process the CSV file.");
@@ -215,6 +219,9 @@ export function CSVUpload() {
         <div className={`${issues.length === 0 ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50"} rounded-md border px-4 py-3`}>
           <p className="text-sm font-medium text-gray-800">
             Loaded {preview.total} employees ({preview.hourly} hourly, {preview.salaried} salaried)
+          </p>
+          <p className="mt-1 text-xs text-gray-600">
+            Imported {preview.importedBonuses} bonuses and {preview.importedCommissions} commissions from the CSV.
           </p>
           {issues.length === 0 && (
             <button

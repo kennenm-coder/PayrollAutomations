@@ -22,6 +22,8 @@ export interface TSheetRow {
   sickUnpaid: number;
   suspensionUnpaid: number;
   unspecifiedUnpaid: number;
+  bonus: number;
+  commission: number;
   approvalState: string;
 }
 
@@ -37,9 +39,13 @@ export interface PayrollUploadRow {
   requestedDayOffPaid: number;
   vacationHours: number;
   militaryLeaveUnpaid: number;
+  noCallNoShow: number;
   personalUnpaid: number;
   requestedDayOffUnpaid: number;
   sickUnpaid: number;
+  suspensionUnpaid: number;
+  unspecifiedUnpaid: number;
+  salaryUnpaidHours: number;
   bonus: number;
   commission: number;
 }
@@ -55,6 +61,7 @@ export type DepartmentSection =
   | "PI/SERVICE";
 
 export interface MasterSummaryRow {
+  employeeNumber: string;
   name: string;
   payType: string;
   baseRate: number;
@@ -65,6 +72,8 @@ export interface MasterSummaryRow {
   vacPay: number;
   holHours: number;
   holPay: number;
+  salaryUnpaidHours: number;
+  salaryUnpaidAdjustment: number;
   bonus: number;
   commission: number;
   regHours: number;
@@ -117,6 +126,24 @@ export interface PayrollConfigurationIssue {
   employeeNumber: string;
   employeeName: string;
   message: string;
+}
+
+export interface PayrollRunRecord {
+  employeeNumber: string;
+  employeeName: string;
+  department: DepartmentSection;
+  payType: string;
+  rateUsed: number;
+  regularHours: number;
+  overtimeHours: number;
+  bonus: number;
+  commission: number;
+  grossPay: number;
+  expectedPayBeforeTaxes: number;
+  vacationHours: number;
+  vacationPay: number;
+  salaryUnpaidHours: number;
+  salaryUnpaidAdjustment: number;
 }
 
 export interface EmployeeConfig {

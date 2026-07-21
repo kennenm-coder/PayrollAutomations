@@ -8,17 +8,20 @@ export function exportPayrollUpload(rows: PayrollUploadRow[]): XLSX.WorkBook {
     "Payroll ID", "Employee Number", "Name", "Reg Hours", "Time at 1.5",
     "Bereavement Hours", "Holiday Hours", "PTO Payout Hours",
     "Requested Day Off - Paid Hours", "Vacation Hours",
-    "Military Leave- Unpaid Hours", "Personal - Unpaid Hours",
+    "Military Leave- Unpaid Hours", "No Call / No Show - Unpaid Hours",
+    "Personal - Unpaid Hours",
     "Requested Day Off - Unpaid Hours", "Sick - Unpaid Hours",
-    "Bonus (manual add)", "Commission (manual add)",
+    "Suspension - Unpaid Hours", "Unspecified - Unpaid Hours",
+    "Salary Unpaid Hours Used", "Bonus", "Commission",
   ];
 
   const data = rows.map((r) => [
     r.payrollId, r.employeeNumber, r.name, r.regHours, r.otHours,
     r.bereavementHours, r.holidayHours, r.ptoPayout,
     r.requestedDayOffPaid, r.vacationHours,
-    r.militaryLeaveUnpaid, r.personalUnpaid,
-    r.requestedDayOffUnpaid, r.sickUnpaid,
+    r.militaryLeaveUnpaid, r.noCallNoShow, r.personalUnpaid,
+    r.requestedDayOffUnpaid, r.sickUnpaid, r.suspensionUnpaid,
+    r.unspecifiedUnpaid, r.salaryUnpaidHours,
     r.bonus || "", r.commission || "",
   ]);
 
@@ -38,7 +41,8 @@ export function exportMasterSummary(groups: DepartmentGroup[], payrollDate: stri
 
   const headers = [
     "Name", "Pay Type", "Base Rate", "Hours", "REG", "OT",
-    "Vac Hours", "Vac Pay", "Hol Hours", "Hol Pay", "Bonus", "Commission",
+    "PTO/Vac Hours", "PTO/Vac Pay", "Hol Hours", "Hol Pay",
+    "Salary Unpaid Hours", "Salary Unpaid Adjustment", "Bonus", "Commission",
     "Reg Hours", "OT", "Gross Pay", "",
     "Health Ins", "Dental/Vision Ins.", "Other Ins.", "Reimb.", "401(k)", "Garnish", "Expected Before Taxes",
   ];
@@ -51,7 +55,8 @@ export function exportMasterSummary(groups: DepartmentGroup[], payrollDate: stri
       rows.push([
         emp.name, emp.payType, emp.baseRate, emp.hours,
         emp.regPay, emp.otPay, emp.vacHours, emp.vacPay,
-        emp.holHours, emp.holPay, emp.bonus, emp.commission,
+        emp.holHours, emp.holPay, emp.salaryUnpaidHours, emp.salaryUnpaidAdjustment,
+        emp.bonus, emp.commission,
         emp.regHours, emp.otHours, emp.grossPay, "",
         emp.healthIns, emp.dentalIns, emp.otherIns, emp.reimb,
         emp.fourOhOneK, emp.garnish, emp.total,
@@ -76,7 +81,7 @@ export function exportMasterSummary(groups: DepartmentGroup[], payrollDate: stri
 
     rows.push([
       "Subtotal", "", "", "", subtotals.regPay, subtotals.otPay,
-      "", "", "", "", "", "", "", "", subtotals.grossPay, "",
+      "", "", "", "", "", "", "", "", "", "", subtotals.grossPay, "",
       subtotals.healthIns, subtotals.dentalIns, subtotals.otherIns,
       subtotals.reimb, subtotals.fourOhOneK, subtotals.garnish, subtotals.total,
     ]);

@@ -7,8 +7,16 @@ import {
   type SheetKey,
   type SheetRecord,
 } from "./sheet-schema";
+import type { PayrollRunRecord } from "./types";
 
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
+const PAYROLL_RUNS_SHEET = "Payroll Runs";
+const PAYROLL_RUN_HEADERS = [
+  "Run ID", "Period Start", "Period End", "Finalized At", "Employee Number",
+  "Employee Name", "Department", "Pay Type", "Rate Used", "Regular Hours",
+  "OT Hours", "Bonus", "Commission", "Gross Pay", "Expected Pay Before Taxes",
+  "Vacation Hours", "Vacation Pay", "Salary Unpaid Hours", "Salary Unpaid Adjustment",
+] as const;
 
 interface ServiceAccountCredentials {
   client_email?: string;
@@ -264,4 +272,94 @@ export async function testEmployeeSheetConnection(): Promise<EmployeeSheetConnec
   ).length;
 
   return { employeeCount, sheetName: "Employees" };
+}
+
+export async function appendPayrollRun(
+  runId: string,
+  periodStart: string,
+  periodEnd: string,
+  records: PayrollRunRecord[]
+) {
+  if (!runId || !periodStart || !periodEnd || records.length === 0) {
+    throw new Error("Payroll run data is incomplete.");
+  }
+
+  const { spreadsheetId, sheets } = getSheetsClient();
+  const existing = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `'${PAYROLL_RUNS_SHEET}'!A2:A`,
+    valueRenderOption: "UNFORMATTED_VALUE",
+  });
+  const runExists = (existing.data.values ?? []).some(
+    (row) => String(row[0] ?? "").trim() === runId
+  );
+  if (runExists) return { saved: false, duplicate: true, runId };
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `'${PAYROLL_RUNS_SHEET}'!A1:S1`,
+    valueInputOption: "RAW",
+    requestBody: { values: [[...PAYROLL_RUN_HEADERS]] },
+  });
+
+  const sheetId = (await sheetIdsByName()).get(PAYROLL_RUNS_SHEET);
+  if (sheetId !== undefined) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [{
+          copyPaste: {
+            source: {
+              sheetId,
+              startRowIndex: 0,
+              endRowIndex: 1,
+              startColumnIndex: 14,
+              endColumnIndex: 15,
+            },
+            destination: {
+              sheetId,
+              startRowIndex: 0,
+              endRowIndex: 1,
+              startColumnIndex: 15,
+              endColumnIndex: 19,
+            },
+            pasteType: "PASTE_FORMAT",
+          },
+        }],
+      },
+    });
+  }
+
+  const finalizedAt = new Date().toISOString();
+  const values = records.map((record) => [
+    runId,
+    periodStart,
+    periodEnd,
+    finalizedAt,
+    record.employeeNumber,
+    record.employeeName,
+    record.department,
+    record.payType,
+    record.rateUsed,
+    record.regularHours,
+    record.overtimeHours,
+    record.bonus,
+    record.commission,
+    record.grossPay,
+    record.expectedPayBeforeTaxes,
+    record.vacationHours,
+    record.vacationPay,
+    record.salaryUnpaidHours,
+    record.salaryUnpaidAdjustment,
+  ]);
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: `'${PAYROLL_RUNS_SHEET}'!A:S`,
+    valueInputOption: "USER_ENTERED",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: { values },
+  });
+
+  return { saved: true, duplicate: false, runId, employeeCount: records.length };
 }

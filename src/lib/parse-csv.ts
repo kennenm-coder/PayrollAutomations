@@ -33,6 +33,11 @@ function num(val: string | undefined): number {
   return isNaN(n) ? 0 : n;
 }
 
+function firstNumber(row: Record<string, string>, headers: string[]) {
+  const header = headers.find((candidate) => row[candidate] !== undefined);
+  return header ? num(row[header]) : 0;
+}
+
 export function parseTSheetsCSV(csvText: string): TSheetRow[] {
   const result = Papa.parse<Record<string, string>>(csvText, {
     header: true,
@@ -69,6 +74,8 @@ export function parseTSheetsCSV(csvText: string): TSheetRow[] {
       sickUnpaid: num(row[CSV_HEADERS[20]]),
       suspensionUnpaid: num(row[CSV_HEADERS[21]]),
       unspecifiedUnpaid: num(row[CSV_HEADERS[22]]),
+      bonus: firstNumber(row, ["Bonus", "Bonus Amount", "Bonus (manual add)"]),
+      commission: firstNumber(row, ["Commission", "Commission Amount", "Commission (manual add)"]),
       approvalState: row[CSV_HEADERS[23]]?.trim() ?? "",
     }));
 }
