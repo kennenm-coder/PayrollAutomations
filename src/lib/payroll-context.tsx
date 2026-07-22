@@ -15,7 +15,12 @@ import type {
   PayrollEmployeeConfig,
   PayrollConfigurationIssue,
 } from "./types";
-import { toPayrollUpload, toMasterSummary, totalUnpaidHours } from "./transform";
+import {
+  toPayrollUpload,
+  toMasterSummary,
+  totalUnpaidHours,
+  roundCurrency,
+} from "./transform";
 
 interface PayrollState {
   tsheetRows: TSheetRow[];
@@ -53,7 +58,7 @@ interface PayrollActions {
 }
 
 const PayrollContext = createContext<(PayrollState & PayrollActions) | null>(null);
-const SESSION_STORAGE_KEY = "rba-payroll-run-draft-v2";
+const SESSION_STORAGE_KEY = "rba-payroll-run-draft-v3";
 
 const INITIAL_PAYROLL_STATE: PayrollState = {
   tsheetRows: [],
@@ -125,8 +130,12 @@ export function PayrollProvider({ children }: { children: ReactNode }) {
       tsheetRows: rows,
       payrollUploadRows: [],
       masterSummaryGroups: [],
-      bonuses: Object.fromEntries(rows.map((row) => [row.employeeNumber, row.bonus])),
-      commissions: Object.fromEntries(rows.map((row) => [row.employeeNumber, row.commission])),
+      bonuses: Object.fromEntries(
+        rows.map((row) => [row.employeeNumber, roundCurrency(row.bonus)])
+      ),
+      commissions: Object.fromEntries(
+        rows.map((row) => [row.employeeNumber, roundCurrency(row.commission)])
+      ),
       salaryUnpaidHours: Object.fromEntries(
         rows.map((row) => [row.employeeNumber, totalUnpaidHours(row)])
       ),
@@ -140,14 +149,14 @@ export function PayrollProvider({ children }: { children: ReactNode }) {
   const setBonus = useCallback((employeeNumber: string, amount: number) => {
     setState((s) => ({
       ...s,
-      bonuses: { ...s.bonuses, [employeeNumber]: amount },
+      bonuses: { ...s.bonuses, [employeeNumber]: roundCurrency(amount) },
     }));
   }, []);
 
   const setCommission = useCallback((employeeNumber: string, amount: number) => {
     setState((s) => ({
       ...s,
-      commissions: { ...s.commissions, [employeeNumber]: amount },
+      commissions: { ...s.commissions, [employeeNumber]: roundCurrency(amount) },
     }));
   }, []);
 

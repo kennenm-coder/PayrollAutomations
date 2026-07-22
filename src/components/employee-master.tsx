@@ -34,7 +34,7 @@ const selectOptions: Record<string, string[]> = {
   Status: ["Ready", "Needs Setup", "Inactive"],
   "Rate Type": ["Hourly", "Salary Per Pay Period"],
   Type: [
-    "Health", "Dental/Vision", "Other Insurance", "Retirement",
+    "Health", "Dental/Vision", "Other Insurance", "Retirement", "Retirement Percentage",
     "Garnishment", "Reimbursement", "Other",
   ],
 };
@@ -51,6 +51,14 @@ function formatMoney(value: SheetCellValue) {
   return Number.isFinite(amount)
     ? amount.toLocaleString("en-US", { style: "currency", currency: "USD" })
     : "$0.00";
+}
+
+function formatDeductionAmount(type: SheetCellValue, value: SheetCellValue) {
+  if (String(type ?? "") === "Retirement Percentage") {
+    const percentage = Number(value ?? 0);
+    return Number.isFinite(percentage) ? `${percentage.toFixed(2)}%` : "0.00%";
+  }
+  return formatMoney(value);
 }
 
 function inputType(header: string) {
@@ -409,6 +417,9 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
   };
 
   const definition = SHEET_DEFINITIONS[activeSheet];
+  const editorDeductionType = activeSheet === "deductions" && editor
+    ? editor.values[SHEET_DEFINITIONS.deductions.headers.indexOf("Type")]
+    : "";
 
   return (
     <div className="space-y-6">
@@ -546,7 +557,9 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
                                 <tr key={deduction.rowNumber}>
                                   <td className="px-3 py-2 font-semibold text-[#202322]">{displayValue(deduction.values.Type)}</td>
                                   <td className="px-3 py-2 text-gray-600">{displayValue(deduction.values.Description)}</td>
-                                  <td className="px-3 py-2 text-right font-semibold">{formatMoney(deduction.values.Amount)}</td>
+                                  <td className="px-3 py-2 text-right font-semibold">
+                                    {formatDeductionAmount(deduction.values.Type, deduction.values.Amount)}
+                                  </td>
                                   <td className="px-3 py-2 text-gray-600">{displayValue(deduction.values["Effective Date"])}</td>
                                   <td className="px-3 py-2 text-gray-600">{displayValue(deduction.values.Active)}</td>
                                   <td className="px-3 py-2 text-right">
@@ -604,7 +617,11 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
               <div className="space-y-4 p-6">
                 {definition.headers.map((header, index) => (
                   <label key={header} className="block">
-                    <span className="mb-1.5 block text-sm font-semibold text-[#343736]">{header}</span>
+                    <span className="mb-1.5 block text-sm font-semibold text-[#343736]">
+                      {header === "Amount" && editorDeductionType === "Retirement Percentage"
+                        ? "Percentage (enter 6 for 6%)"
+                        : header}
+                    </span>
                     {selectOptions[header] ? (
                       <select
                         value={editor.values[index]}
@@ -618,6 +635,8 @@ function SheetEditor({ onLogout }: { onLogout: () => Promise<void> }) {
                       <input
                         type={inputType(header)}
                         step={header === "Amount" ? "0.01" : undefined}
+                        min={header === "Amount" && editorDeductionType === "Retirement Percentage" ? "0" : undefined}
+                        max={header === "Amount" && editorDeductionType === "Retirement Percentage" ? "100" : undefined}
                         value={editor.values[index]}
                         onChange={(event) => setEditor({ ...editor, values: editor.values.map((value, valueIndex) => valueIndex === index ? event.target.value : value) })}
                         className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-[#78BE20] focus:ring-2 focus:ring-[#78BE20]/20"

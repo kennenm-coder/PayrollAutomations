@@ -35,8 +35,10 @@ export function toPayrollUpload(
       suspensionUnpaid: r.suspensionUnpaid,
       unspecifiedUnpaid: r.unspecifiedUnpaid,
       salaryUnpaidHours: salaryUnpaidHours[r.employeeNumber] ?? totalUnpaidHours(r),
-      bonus: bonuses[r.employeeNumber] ?? 0,
-      commission: config?.commissionEligible ? commissions[r.employeeNumber] ?? 0 : 0,
+      bonus: roundCurrency(bonuses[r.employeeNumber] ?? 0),
+      commission: config?.commissionEligible
+        ? roundCurrency(commissions[r.employeeNumber] ?? 0)
+        : 0,
     };
   });
 }
@@ -51,11 +53,20 @@ export function totalUnpaidHours(row: TSheetRow) {
     + row.unspecifiedUnpaid;
 }
 
-function roundMoney(value: number) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
+function toCents(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round((value + Number.EPSILON) * 100);
 }
 
-function deductionTotals(config: PayrollEmployeeConfig) {
+function fromCents(value: number) {
+  return value / 100;
+}
+
+export function roundCurrency(value: number) {
+  return fromCents(toCents(value));
+}
+
+function deductionTotals(config: PayrollEmployeeConfig, grossPayCents: number) {
   const totals = {
     healthIns: 0,
     dentalIns: 0,
@@ -66,15 +77,34 @@ function deductionTotals(config: PayrollEmployeeConfig) {
   };
 
   for (const deduction of config.deductions) {
-    if (deduction.type === "Health") totals.healthIns += deduction.amount;
-    else if (deduction.type === "Dental/Vision") totals.dentalIns += deduction.amount;
-    else if (deduction.type === "Retirement") totals.fourOhOneK += deduction.amount;
-    else if (deduction.type === "Garnishment") totals.garnish += deduction.amount;
-    else if (deduction.type === "Reimbursement") totals.reimb += deduction.amount;
-    else totals.otherIns += deduction.amount;
+    const amountCents = toCents(deduction.amount);
+    if (deduction.type === "Health") totals.healthIns += amountCents;
+    else if (deduction.type === "Dental/Vision") totals.dentalIns += amountCents;
+    else if (deduction.type === "Retirement") totals.fourOhOneK += amountCents;
+    else if (deduction.type === "Retirement Percentage") {
+      totals.fourOhOneK += Math.round((grossPayCents * deduction.amount) / 100);
+    }
+    else if (deduction.type === "Garnishment") totals.garnish += amountCents;
+    else if (deduction.type === "Reimbursement") totals.reimb += amountCents;
+    else totals.otherIns += amountCents;
   }
 
-  return totals;
+  const totalCents = totals.healthIns
+    + totals.dentalIns
+    + totals.otherIns
+    + totals.fourOhOneK
+    + totals.garnish
+    - totals.reimb;
+
+  return {
+    healthIns: fromCents(totals.healthIns),
+    dentalIns: fromCents(totals.dentalIns),
+    otherIns: fromCents(totals.otherIns),
+    reimb: fromCents(totals.reimb),
+    fourOhOneK: fromCents(totals.fourOhOneK),
+    garnish: fromCents(totals.garnish),
+    totalCents,
+  };
 }
 
 export function toMasterSummary(
@@ -90,23 +120,38 @@ export function toMasterSummary(
 
     const dept = config.department;
     const rate = config.rateAmount;
-    const ded = deductionTotals(config);
     const isSalary = config.payType === "Salary";
 
     const ptoHours = row.vacationHours + row.ptoPayout + row.requestedDayOffPaid;
     const salaryUnpaidHours = isSalary ? row.salaryUnpaidHours : 0;
-    const salaryUnpaidAdjustment = isSalary ? roundMoney((rate / 80) * salaryUnpaidHours) : 0;
-    const regPay = isSalary ? rate : roundMoney(row.regHours * rate);
-    const otPay = isSalary ? 0 : roundMoney(row.otHours * rate * 1.5);
-    const vacPay = isSalary ? 0 : roundMoney(ptoHours * rate);
-    const holPay = isSalary ? 0 : roundMoney(row.holidayHours * rate);
+    const salaryUnpaidAdjustmentCents = isSalary
+      ? toCents((rate / 80) * salaryUnpaidHours)
+      : 0;
+    const regPayCents = isSalary ? toCents(rate) : toCents(row.regHours * rate);
+    const otPayCents = isSalary ? 0 : toCents(row.otHours * rate * 1.5);
+    const vacPayCents = isSalary ? 0 : toCents(ptoHours * rate);
+    const holPayCents = isSalary ? 0 : toCents(row.holidayHours * rate);
+    const bonusCents = toCents(row.bonus);
+    const commissionCents = toCents(row.commission);
     const totalHours = row.regHours + row.otHours + ptoHours + row.holidayHours;
 
-    const grossPay = roundMoney(
-      regPay + otPay + vacPay + holPay + row.bonus + row.commission - salaryUnpaidAdjustment
-    );
-    const totalDeductions = ded.healthIns + ded.dentalIns + ded.otherIns + ded.fourOhOneK + ded.garnish - ded.reimb;
-    const total = roundMoney(grossPay - totalDeductions);
+    const grossPayCents = regPayCents
+      + otPayCents
+      + vacPayCents
+      + holPayCents
+      + bonusCents
+      + commissionCents
+      - salaryUnpaidAdjustmentCents;
+    const ded = deductionTotals(config, grossPayCents);
+    const totalCents = grossPayCents - ded.totalCents;
+
+    const regPay = fromCents(regPayCents);
+    const otPay = fromCents(otPayCents);
+    const vacPay = fromCents(vacPayCents);
+    const holPay = fromCents(holPayCents);
+    const salaryUnpaidAdjustment = fromCents(salaryUnpaidAdjustmentCents);
+    const grossPay = fromCents(grossPayCents);
+    const total = fromCents(totalCents);
 
     const summaryRow: MasterSummaryRow = {
       employeeNumber: row.employeeNumber,

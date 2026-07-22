@@ -98,6 +98,7 @@ export type PayrollDeductionType =
   | "Dental/Vision"
   | "Other Insurance"
   | "Retirement"
+  | "Retirement Percentage"
   | "Garnishment"
   | "Reimbursement"
   | "Other";

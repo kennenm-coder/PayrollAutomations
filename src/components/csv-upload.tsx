@@ -59,6 +59,12 @@ function validateConfiguration(
     if (config.payType === "Salary" && config.rateType !== "Salary Per Pay Period") {
       addIssue("Salary employee needs a Salary Per Pay Period rate.");
     }
+    if (config.deductions.some((deduction) =>
+      deduction.type === "Retirement Percentage"
+      && (deduction.amount < 0 || deduction.amount > 100)
+    )) {
+      addIssue("Retirement Percentage must be between 0 and 100.");
+    }
   }
 
   return issues;
