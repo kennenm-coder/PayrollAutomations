@@ -20,6 +20,50 @@ function periodEndFrom(value: string) {
     : null;
 }
 
+function toIsoDate(month: string, day: string, year: string) {
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function payrollDatesFrom(value: string) {
+  const [startValue, endValue] = value.split(/\s+thru\s*/i);
+  if (endValue !== undefined) {
+    const dateFrom = (part: string) => {
+      const isoDate = part.match(/\d{4}-\d{2}-\d{2}/)?.[0];
+      if (isoDate) return isoDate;
+      const usDate = part.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      return usDate ? toIsoDate(usDate[1], usDate[2], usDate[3]) : "";
+    };
+    return { startDate: dateFrom(startValue), endDate: dateFrom(endValue) };
+  }
+
+  const isoDates = [...value.matchAll(/\d{4}-\d{2}-\d{2}/g)].map((match) => match[0]);
+  if (isoDates.length >= 2) {
+    return { startDate: isoDates[0], endDate: isoDates.at(-1) ?? "" };
+  }
+
+  const usDates = [...value.matchAll(/(\d{1,2})\/(\d{1,2})\/(\d{4})/g)].map(
+    (match) => toIsoDate(match[1], match[2], match[3])
+  );
+  return {
+    startDate: usDates[0] ?? "",
+    endDate: usDates.length >= 2 ? usDates.at(-1) ?? "" : "",
+  };
+}
+
+function formatIsoDate(value: string) {
+  const [year, month, day] = value.split("-");
+  return `${Number(month)}/${Number(day)}/${year}`;
+}
+
+function formatPayrollDate(startDate: string, endDate: string) {
+  if (startDate && endDate) {
+    return `${formatIsoDate(startDate)} thru ${formatIsoDate(endDate)}`;
+  }
+  if (startDate) return `${startDate} thru `;
+  if (endDate) return ` thru ${endDate}`;
+  return "";
+}
+
 function validateConfiguration(
   rows: TSheetRow[],
   configs: Record<string, PayrollEmployeeConfig>
@@ -78,6 +122,7 @@ export function CSVUpload() {
     setPayrollDate,
     setPayrollConfiguration,
   } = usePayroll();
+  const { startDate, endDate } = payrollDatesFrom(payrollDate);
   const [fileName, setFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [issues, setIssues] = useState<PayrollConfigurationIssue[]>([]);
@@ -98,13 +143,13 @@ export function CSVUpload() {
 
     const dateMatch = file.name.match(/(\d{4}-\d{2}-\d{2})_thru_(\d{4}-\d{2}-\d{2})/);
     const selectedPayrollDate = dateMatch
-      ? `${dateMatch[1]} thru ${dateMatch[2]}`
+      ? formatPayrollDate(dateMatch[1], dateMatch[2])
       : payrollDate;
     if (dateMatch) setPayrollDate(selectedPayrollDate);
 
     const periodEnd = periodEndFrom(selectedPayrollDate);
     if (!periodEnd) {
-      setError("Enter the payroll date range before uploading the CSV.");
+      setError("Select both the start date and end date before uploading the CSV.");
       return;
     }
 
@@ -167,14 +212,37 @@ export function CSVUpload() {
   return (
     <div className="space-y-6">
       <div>
-        <label className="mb-2 block text-sm font-medium text-gray-700">Payroll Date</label>
-        <input
-          type="text"
-          placeholder="e.g. 6/22/2026 thru 7/5/2026"
-          className="w-full max-w-md rounded-md border border-gray-300 px-3 py-2 text-sm"
-          value={payrollDate}
-          onChange={(event) => setPayrollDate(event.target.value)}
-        />
+        <p className="mb-2 text-sm font-medium text-gray-700">Payroll Date Range</p>
+        <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
+          <label className="text-sm text-gray-700">
+            <span className="mb-1 block">Start Date</span>
+            <input
+              type="date"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              value={startDate}
+              max={endDate || undefined}
+              onChange={(event) => {
+                const value = event.target.value;
+                setPayrollDate(formatPayrollDate(value, endDate));
+                setError(null);
+              }}
+            />
+          </label>
+          <label className="text-sm text-gray-700">
+            <span className="mb-1 block">End Date</span>
+            <input
+              type="date"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              value={endDate}
+              min={startDate || undefined}
+              onChange={(event) => {
+                const value = event.target.value;
+                setPayrollDate(formatPayrollDate(startDate, value));
+                setError(null);
+              }}
+            />
+          </label>
+        </div>
       </div>
 
       <div
