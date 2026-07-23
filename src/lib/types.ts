@@ -85,6 +85,13 @@ export interface MasterSummaryRow {
   reimb: number;
   fourOhOneK: number;
   garnish: number;
+  deductionDetails: {
+    key: string;
+    label: string;
+    amount: number;
+    reimbursement: boolean;
+  }[];
+  totalDeductions: number;
   total: number;
 }
 
@@ -99,6 +106,7 @@ export type PayrollDeductionType =
   | "Other Insurance"
   | "Retirement"
   | "Retirement Percentage"
+  | "401(k) Fixed Charge"
   | "Garnishment"
   | "Reimbursement"
   | "Other";

@@ -75,15 +75,37 @@ function deductionTotals(config: PayrollEmployeeConfig, grossPayCents: number) {
     fourOhOneK: 0,
     garnish: 0,
   };
+  const detailTotals = new Map<string, {
+    key: string;
+    label: string;
+    amountCents: number;
+    reimbursement: boolean;
+  }>();
 
   for (const deduction of config.deductions) {
-    const amountCents = toCents(deduction.amount);
+    const amountCents = deduction.type === "Retirement Percentage"
+      ? Math.round((grossPayCents * deduction.amount) / 100)
+      : toCents(deduction.amount);
+    const reimbursement = deduction.type === "Reimbursement";
+    const label = deduction.description
+      ? `${deduction.type}: ${deduction.description}`
+      : deduction.type;
+    const key = `${deduction.type}::${deduction.description}`;
+    const existingDetail = detailTotals.get(key);
+    detailTotals.set(key, {
+      key,
+      label,
+      amountCents: (existingDetail?.amountCents ?? 0) + amountCents,
+      reimbursement,
+    });
+
     if (deduction.type === "Health") totals.healthIns += amountCents;
     else if (deduction.type === "Dental/Vision") totals.dentalIns += amountCents;
-    else if (deduction.type === "Retirement") totals.fourOhOneK += amountCents;
-    else if (deduction.type === "Retirement Percentage") {
-      totals.fourOhOneK += Math.round((grossPayCents * deduction.amount) / 100);
-    }
+    else if (
+      deduction.type === "Retirement"
+      || deduction.type === "Retirement Percentage"
+      || deduction.type === "401(k) Fixed Charge"
+    ) totals.fourOhOneK += amountCents;
     else if (deduction.type === "Garnishment") totals.garnish += amountCents;
     else if (deduction.type === "Reimbursement") totals.reimb += amountCents;
     else totals.otherIns += amountCents;
@@ -103,6 +125,13 @@ function deductionTotals(config: PayrollEmployeeConfig, grossPayCents: number) {
     reimb: fromCents(totals.reimb),
     fourOhOneK: fromCents(totals.fourOhOneK),
     garnish: fromCents(totals.garnish),
+    deductionDetails: [...detailTotals.values()].map((detail) => ({
+      key: detail.key,
+      label: detail.label,
+      amount: fromCents(detail.amountCents),
+      reimbursement: detail.reimbursement,
+    })),
+    totalDeductions: fromCents(totalCents),
     totalCents,
   };
 }
@@ -178,6 +207,8 @@ export function toMasterSummary(
       reimb: ded.reimb,
       fourOhOneK: ded.fourOhOneK,
       garnish: ded.garnish,
+      deductionDetails: ded.deductionDetails,
+      totalDeductions: ded.totalDeductions,
       total,
     };
 

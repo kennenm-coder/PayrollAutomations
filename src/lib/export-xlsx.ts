@@ -35,6 +35,16 @@ export function exportPayrollUpload(rows: PayrollUploadRow[]): XLSX.WorkBook {
 export function exportMasterSummary(groups: DepartmentGroup[], payrollDate: string): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
   const rows: (string | number)[][] = [];
+  const deductionColumns = [...new Map(
+    groups.flatMap((group) =>
+      group.employees.flatMap((employee) =>
+        employee.deductionDetails.map((deduction) => [
+          deduction.key,
+          { key: deduction.key, label: deduction.label },
+        ] as const)
+      )
+    )
+  ).values()];
 
   rows.push([`RBA Payroll ${payrollDate}`]);
   rows.push([]);
@@ -43,8 +53,9 @@ export function exportMasterSummary(groups: DepartmentGroup[], payrollDate: stri
     "Name", "Pay Type", "Base Rate", "Hours", "REG", "OT",
     "PTO/Vac Hours", "PTO/Vac Pay", "Hol Hours", "Hol Pay",
     "Salary Unpaid Hours", "Salary Unpaid Adjustment", "Bonus", "Commission",
-    "Reg Hours", "OT", "Gross Pay", "",
-    "Health Ins", "Dental/Vision Ins.", "Other Ins.", "Reimb.", "401(k)", "Garnish", "Expected Before Taxes",
+    "Reg Hours", "OT Hours", "Gross Pay",
+    ...deductionColumns.map((deduction) => deduction.label),
+    "Total Deductions", "Expected Before Taxes",
   ];
 
   for (const group of groups) {
@@ -57,9 +68,11 @@ export function exportMasterSummary(groups: DepartmentGroup[], payrollDate: stri
         emp.regPay, emp.otPay, emp.vacHours, emp.vacPay,
         emp.holHours, emp.holPay, emp.salaryUnpaidHours, emp.salaryUnpaidAdjustment,
         emp.bonus, emp.commission,
-        emp.regHours, emp.otHours, emp.grossPay, "",
-        emp.healthIns, emp.dentalIns, emp.otherIns, emp.reimb,
-        emp.fourOhOneK, emp.garnish, emp.total,
+        emp.regHours, emp.otHours, emp.grossPay,
+        ...deductionColumns.map((deduction) =>
+          emp.deductionDetails.find((detail) => detail.key === deduction.key)?.amount ?? 0
+        ),
+        emp.totalDeductions, emp.total,
       ]);
     }
 
@@ -69,21 +82,22 @@ export function exportMasterSummary(groups: DepartmentGroup[], payrollDate: stri
         otPay: acc.otPay + e.otPay,
         grossPay: acc.grossPay + e.grossPay,
         total: acc.total + e.total,
-        healthIns: acc.healthIns + e.healthIns,
-        dentalIns: acc.dentalIns + e.dentalIns,
-        otherIns: acc.otherIns + e.otherIns,
-        reimb: acc.reimb + e.reimb,
-        fourOhOneK: acc.fourOhOneK + e.fourOhOneK,
-        garnish: acc.garnish + e.garnish,
+        totalDeductions: acc.totalDeductions + e.totalDeductions,
       }),
-      { regPay: 0, otPay: 0, grossPay: 0, total: 0, healthIns: 0, dentalIns: 0, otherIns: 0, reimb: 0, fourOhOneK: 0, garnish: 0 }
+      { regPay: 0, otPay: 0, grossPay: 0, total: 0, totalDeductions: 0 }
     );
 
     rows.push([
       "Subtotal", "", "", "", subtotals.regPay, subtotals.otPay,
-      "", "", "", "", "", "", "", "", "", "", subtotals.grossPay, "",
-      subtotals.healthIns, subtotals.dentalIns, subtotals.otherIns,
-      subtotals.reimb, subtotals.fourOhOneK, subtotals.garnish, subtotals.total,
+      "", "", "", "", "", "", "", "", "", "", subtotals.grossPay,
+      ...deductionColumns.map((deduction) =>
+        group.employees.reduce(
+          (sum, employee) =>
+            sum + (employee.deductionDetails.find((detail) => detail.key === deduction.key)?.amount ?? 0),
+          0
+        )
+      ),
+      subtotals.totalDeductions, subtotals.total,
     ]);
     rows.push([]);
   }

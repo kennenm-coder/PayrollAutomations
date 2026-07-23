@@ -35,7 +35,7 @@ const selectOptions: Record<string, string[]> = {
   "Rate Type": ["Hourly", "Salary Per Pay Period"],
   Type: [
     "Health", "Dental/Vision", "Other Insurance", "Retirement", "Retirement Percentage",
-    "Garnishment", "Reimbursement", "Other",
+    "401(k) Fixed Charge", "Garnishment", "Reimbursement", "Other",
   ],
 };
 

@@ -58,7 +58,7 @@ interface PayrollActions {
 }
 
 const PayrollContext = createContext<(PayrollState & PayrollActions) | null>(null);
-const SESSION_STORAGE_KEY = "rba-payroll-run-draft-v3";
+const SESSION_STORAGE_KEY = "rba-payroll-run-draft-v4";
 
 const INITIAL_PAYROLL_STATE: PayrollState = {
   tsheetRows: [],

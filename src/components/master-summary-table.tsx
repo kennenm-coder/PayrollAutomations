@@ -1,6 +1,7 @@
 "use client";
 
 import { usePayroll } from "@/lib/payroll-context";
+import type { MasterSummaryRow } from "@/lib/types";
 
 function fmt(n: number): string {
   if (n === 0) return "-";
@@ -10,6 +11,10 @@ function fmt(n: number): string {
 function fmtCurrency(n: number): string {
   if (n === 0) return "-";
   return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function deductionAmount(employee: MasterSummaryRow, key: string) {
+  return employee.deductionDetails.find((deduction) => deduction.key === key)?.amount ?? 0;
 }
 
 export function MasterSummaryTable() {
@@ -37,6 +42,16 @@ export function MasterSummaryTable() {
     (total, group) => total + group.employees.reduce((sum, employee) => sum + employee.total, 0),
     0
   );
+  const deductionColumns = [...new Map(
+    masterSummaryGroups.flatMap((group) =>
+      group.employees.flatMap((employee) =>
+        employee.deductionDetails.map((deduction) => [
+          deduction.key,
+          { key: deduction.key, label: deduction.label, reimbursement: deduction.reimbursement },
+        ] as const)
+      )
+    )
+  ).values()];
 
   return (
     <div className="space-y-8">
@@ -49,10 +64,10 @@ export function MasterSummaryTable() {
               {group.section}
             </div>
             <div className="overflow-x-auto">
-              <table className="min-w-full text-xs">
+              <table className="min-w-max text-xs">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-2 py-2 text-left font-medium">Name</th>
+                    <th className="sticky left-0 z-10 min-w-44 bg-gray-50 px-2 py-2 text-left font-medium">Name</th>
                     <th className="px-2 py-2 text-left font-medium">Pay Type</th>
                     <th className="px-2 py-2 text-right font-medium">Rate</th>
                     <th className="px-2 py-2 text-right font-medium">Reg Hrs</th>
@@ -68,17 +83,26 @@ export function MasterSummaryTable() {
                     <th className="px-2 py-2 text-right font-medium">Bonus</th>
                     <th className="px-2 py-2 text-right font-medium">Comm</th>
                     <th className="px-2 py-2 text-right font-medium bg-green-50">Gross Pay</th>
-                    <th className="px-2 py-2 text-right font-medium">Health</th>
-                    <th className="px-2 py-2 text-right font-medium">Dental</th>
-                    <th className="px-2 py-2 text-right font-medium">401(k)</th>
-                    <th className="px-2 py-2 text-right font-medium">Garnish</th>
+                    {deductionColumns.map((deduction) => (
+                      <th
+                        key={deduction.key}
+                        className={`min-w-32 px-2 py-2 text-right font-medium ${
+                          deduction.reimbursement ? "bg-blue-50 text-blue-800" : "bg-red-50 text-red-800"
+                        }`}
+                      >
+                        {deduction.label}
+                      </th>
+                    ))}
+                    <th className="min-w-28 bg-red-100 px-2 py-2 text-right font-medium text-red-900">
+                      Total Deductions
+                    </th>
                     <th className="bg-[#F1F8E8] px-2 py-2 text-right font-medium">Expected</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {group.employees.map((emp) => (
-                    <tr key={emp.name} className="hover:bg-gray-50">
-                      <td className="px-2 py-1.5 font-medium">{emp.name}</td>
+                    <tr key={emp.employeeNumber} className="group hover:bg-gray-50">
+                      <td className="sticky left-0 z-10 bg-white px-2 py-1.5 font-medium group-hover:bg-gray-50">{emp.name}</td>
                       <td className="px-2 py-1.5 text-gray-500">{emp.payType}</td>
                       <td className="px-2 py-1.5 text-right">{fmtCurrency(emp.baseRate)}</td>
                       <td className="px-2 py-1.5 text-right">{fmt(emp.regHours)}</td>
@@ -98,19 +122,38 @@ export function MasterSummaryTable() {
                       <td className="px-2 py-1.5 text-right">{fmtCurrency(emp.bonus)}</td>
                       <td className="px-2 py-1.5 text-right">{fmtCurrency(emp.commission)}</td>
                       <td className="px-2 py-1.5 text-right bg-green-50 font-medium">{fmtCurrency(emp.grossPay)}</td>
-                      <td className="px-2 py-1.5 text-right">{fmtCurrency(emp.healthIns)}</td>
-                      <td className="px-2 py-1.5 text-right">{fmtCurrency(emp.dentalIns)}</td>
-                      <td className="px-2 py-1.5 text-right">{fmtCurrency(emp.fourOhOneK)}</td>
-                      <td className="px-2 py-1.5 text-right">{fmtCurrency(emp.garnish)}</td>
+                      {deductionColumns.map((deduction) => (
+                        <td
+                          key={deduction.key}
+                          className={`px-2 py-1.5 text-right ${
+                            deduction.reimbursement ? "bg-blue-50/60 text-blue-800" : "bg-red-50/60 text-red-800"
+                          }`}
+                        >
+                          {fmtCurrency(deductionAmount(emp, deduction.key))}
+                        </td>
+                      ))}
+                      <td className="bg-red-100/70 px-2 py-1.5 text-right font-semibold text-red-900">
+                        {fmtCurrency(emp.totalDeductions)}
+                      </td>
                       <td className="bg-[#F1F8E8] px-2 py-1.5 text-right font-medium">{fmtCurrency(emp.total)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="bg-gray-100 font-semibold">
                   <tr>
-                    <td className="px-2 py-2" colSpan={15}>Subtotal</td>
+                    <td className="sticky left-0 z-10 bg-gray-100 px-2 py-2" colSpan={15}>Subtotal</td>
                     <td className="px-2 py-2 text-right bg-green-100">{fmtCurrency(sectionGross)}</td>
-                    <td colSpan={4} />
+                    {deductionColumns.map((deduction) => (
+                      <td key={deduction.key} className="px-2 py-2 text-right">
+                        {fmtCurrency(group.employees.reduce(
+                          (sum, employee) => sum + deductionAmount(employee, deduction.key),
+                          0
+                        ))}
+                      </td>
+                    ))}
+                    <td className="bg-red-100 px-2 py-2 text-right text-red-900">
+                      {fmtCurrency(group.employees.reduce((sum, employee) => sum + employee.totalDeductions, 0))}
+                    </td>
                     <td className="bg-[#DDEFC6] px-2 py-2 text-right">{fmtCurrency(sectionTotal)}</td>
                   </tr>
                 </tfoot>
