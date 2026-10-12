@@ -23,6 +23,27 @@ interface ServiceAccountCredentials {
   private_key?: string;
 }
 
+/**
+ * Neutralise spreadsheet formula injection in free-text cells.
+ *
+ * The payroll-run append uses valueInputOption "USER_ENTERED" so the period
+ * dates land as real dates rather than text. The flip side is that any cell
+ * beginning with = + - or @ is evaluated as a FORMULA. An employee name or
+ * department carrying a leading "=" would therefore execute inside the payroll
+ * record — at best a #REF! mess, at worst a formula that pulls data across
+ * tabs or out to a URL.
+ *
+ * A leading apostrophe tells Sheets "this is literal text" and is not itself
+ * displayed. Applied only to the text columns, so the numeric ones stay
+ * numbers.
+ */
+function asLiteralText(value: SheetCellValue | string | number | null | undefined): string {
+  const text = value == null ? "" : String(value);
+  const first = text.trimStart().charAt(0);
+  const dangerous = first.length > 0 && "=+-@".includes(first);
+  return dangerous ? `'${text}` : text;
+}
+
 export interface EmployeeSheetConnection {
   employeeCount: number;
   sheetName: "Employees";
@@ -336,10 +357,10 @@ export async function appendPayrollRun(
     periodStart,
     periodEnd,
     finalizedAt,
-    record.employeeNumber,
-    record.employeeName,
-    record.department,
-    record.payType,
+    asLiteralText(record.employeeNumber),
+    asLiteralText(record.employeeName),
+    asLiteralText(record.department),
+    asLiteralText(record.payType),
     record.rateUsed,
     record.regularHours,
     record.overtimeHours,
